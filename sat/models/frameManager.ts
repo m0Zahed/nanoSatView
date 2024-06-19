@@ -32,13 +32,6 @@ export default class frameManager {
       this.framesAdded = true;
     }
   }
-  
-  /**
-   * @brief Rotate the plane by an amount specified 
-   */
-  rotatePlanet(angle : number){
-    this.axeMan.applyFrameRotation(this.planet, angle, 'z', 'ECEF');
-  }
 
   /**
    * @brief rotate w.r.t an axis in a particular frame. 

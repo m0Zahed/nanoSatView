@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+<<<<<<< HEAD
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.5",
     "@mui/icons-material": "^5.15.20",
@@ -25,14 +26,23 @@
     "satellite.js": "^5.0.0",
     "three": "^0.165.0",
     "three.meshline": "^1.4.0"
+=======
+    "next": "14.2.3",
+    "react": "^18",
+    "react-dom": "^18",
+    "three": "^0.165.0"
+>>>>>>> 243907303ae2eb4f9e7b2d85bde2e5e0ec9762f0
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+<<<<<<< HEAD
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",
+=======
+>>>>>>> 243907303ae2eb4f9e7b2d85bde2e5e0ec9762f0
     "typescript": "^5"
   }
 }

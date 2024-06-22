@@ -49,10 +49,21 @@ export default class Planet {
     this.coordRef = new THREE.Mesh(geometry, coordmesh);
     this.coordRef.name = 'cloudRef';
 
+<<<<<<< HEAD
+=======
+    // Light
+    const lights = new THREE.DirectionalLight(0xFFFFFF);
+    lights.position.set(10, 0, 0);
+
+>>>>>>> 243907303ae2eb4f9e7b2d85bde2e5e0ec9762f0
     // Create a Group Reference
     this.group.add(this.sphereRef);
     this.group.add(this.coordRef);
     this.group.add(this.cloudRef);
+<<<<<<< HEAD
+=======
+    this.group.add(lights);
+>>>>>>> 243907303ae2eb4f9e7b2d85bde2e5e0ec9762f0
 
     this.loadedTexture = true;
 

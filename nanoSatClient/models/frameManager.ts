@@ -1,4 +1,5 @@
 import AxesManager from './AxesManager.ts';
+<<<<<<< HEAD
 import sunLight from './sunLight.js';
 
 export default class frameManager {
@@ -28,6 +29,23 @@ export default class frameManager {
     this.axeMan.addObjectToFrame(this.sunLight.get(), 'ECI');
   } 
 
+=======
+
+export default class frameManager {
+  axeMan : AxesManager;
+  planet : planet;
+  private framesAdded = false; // New flag to check if frames are added
+
+  /**
+   * @brief 
+   */
+  constructor(length : int, planet_ : planet){
+    this.axeMan = new AxesManager(length);
+    this.planet = planet_;
+    this._addPlanetToECEF();
+  }
+  
+>>>>>>> 243907303ae2eb4f9e7b2d85bde2e5e0ec9762f0
   /**
    * @brief Applies frame rotation and adds planet to ECEF Group 
    */

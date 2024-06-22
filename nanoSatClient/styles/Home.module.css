@@ -7,6 +7,7 @@
   min-height: 100vh;
 }
 
+<<<<<<< HEAD
 .container {
   position: relative;
   width: 100%;
@@ -19,6 +20,8 @@
   height: 100%;
 }
 
+=======
+>>>>>>> 243907303ae2eb4f9e7b2d85bde2e5e0ec9762f0
 .description {
   display: inherit;
   justify-content: inherit;
@@ -239,5 +242,8 @@
     transform: rotate(0deg);
   }
 }
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> 243907303ae2eb4f9e7b2d85bde2e5e0ec9762f0

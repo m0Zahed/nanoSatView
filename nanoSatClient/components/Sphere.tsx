@@ -15,9 +15,14 @@ import { addMeridianAndEquator } from '../utils/utils';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import axios from 'axios';
 import * as satellite from 'satellite.js';
+<<<<<<< HEAD
 import frameManager from '@/models/frameManager.ts';
 import planet from '@/models/planet.ts';
 import sunLight from '@/models/sunLight';
+=======
+import frameManager from '../models/frameManager.ts';
+import planet from '../models/planet.ts';
+>>>>>>> 243907303ae2eb4f9e7b2d85bde2e5e0ec9762f0
 
 const Sphere: React.FC = () => {
 
@@ -34,6 +39,7 @@ const Sphere: React.FC = () => {
     new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
   );
   const planetRef = useRef<planet | null>(null);
+<<<<<<< HEAD
   const sunLightRef = useRef<sunLight | null>(null);
   const managerRef = useRef<frameManager | null>(null);  
   const controlsRef = useRef<OrbitControls | null>(null);
@@ -48,6 +54,23 @@ const Sphere: React.FC = () => {
       addMeridianAndEquator(planetRef.current.group);
       managerRef.current.addAllFramesToScene(sceneRef.current);
       initialisedScene.current = true;
+=======
+  const managerRef = useRef<frameManager | null>(null);  
+  const controlsRef = useRef<OrbitControls | null>(null);
+  const initialisedWorld = useRef<boolean>(false);
+  // -------------------------- FUNCTIONS ------------------------------------
+  
+  const initialiseWorld = (length=7) => {
+    if(!initialiseScene.current) { 
+      // Init the planet
+      planetRef.current = new planet(); 
+      managerRef.current = new frameManager(length, planetRef.current);
+      addMeridianAndEquator(planetRef.current.group);
+      
+      managerRef.current.addAllFramesToScene(sceneRef.current);
+
+      initialiseScene.current = true;
+>>>>>>> 243907303ae2eb4f9e7b2d85bde2e5e0ec9762f0
     }
   };  
 
@@ -90,6 +113,10 @@ const Sphere: React.FC = () => {
     // Initialize controls
     controlsRef.current = new OrbitControls(cameraRef.current, rendererRef.current.domElement);
     controlsRef.current.enableZoom = true;
+<<<<<<< HEAD
+=======
+
+>>>>>>> 243907303ae2eb4f9e7b2d85bde2e5e0ec9762f0
   };
 
   // Propagate the orbit of the ISS and then plot it.

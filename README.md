@@ -14,7 +14,7 @@ With Nano SAT VIEW, users can effortlessly explore and analyze satellite traject
 
 ## Architecture
 
-Nano SAT VIEW is designed with a robust architecture to visualize satellite orbits around the Earth, leveraging several modern technologies. Below is a detailed explanation of the architecture:
+*nanoSatView* is designed with a robust architecture to visualize satellite orbits around the Earth, leveraging several modern technologies. Below is a detailed explanation of the architecture:
 
 ![Architecture](./assets/Architecture.png)
 

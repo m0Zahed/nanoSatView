@@ -14,14 +14,13 @@
 - **Technology**: Uses ThreeJS for interactive and realistic 3D graphics.
 
 ### 2. Information Engine
-- **Role**: Acts as a central processing unit for various types of requests related to satellite data.
+- **Role**: Acts as the frontend for various types of requests related to satellite data.
 - **Functions**:
   - Converts TLEs to ECI using SGP4.
   - Converts ECI to Geodetic coordinates.
   - Determines the look-up angle based on location and satellite in orbit.
   - Fetches satellite TLEs and propagates them around the globe.
   - Converts addresses to Geodetic coordinates.
-  - Converts Geodetic coordinates to elevation.
 
 ### 3. Backend
 - **Infrastructure**: Runs on Kubernetes to manage containerized applications.

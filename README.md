@@ -1,10 +1,6 @@
 # nanoSatView
 *nanoSatView* is an advanced application designed to visualize satellite orbits around the Earth. Leveraging the power of ThreeJS for 3D rendering, NextJS Generative UI for a dynamic and responsive user interface, and a robust .NET backend, Nano SAT VIEW offers a comprehensive solution for satellite orbit visualization.
 
-With Nano SAT VIEW, users can effortlessly explore and analyze satellite trajectories, making it an essential tool for researchers, educators, and space enthusiasts.
-
----
-
 ## Architecture
 
 *nanoSatView* is designed with a robust architecture to visualize satellite orbits around the Earth, leveraging several modern technologies. Below is a detailed explanation of the architecture:

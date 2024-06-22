@@ -5,9 +5,8 @@
  *  The following contains all the logic to render the planet and then 
  *
  *  The Orientation of the axes is as follows. Because the 
- *        blue -> x           -> world(z)
- *        orange - > y        -> world(x)
- *        green -> z          -> world(y)
+ *        White -> x           -> ECI
+ *        brown -> y           -> ECEF 
  */
 
 import React, { useState, useRef, useEffect } from 'react';

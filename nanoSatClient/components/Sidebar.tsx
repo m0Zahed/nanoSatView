@@ -1,8 +1,9 @@
 import { Drawer, IconButton, Typography, Box } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import AutocompleteSearchBar from './AutocompleteSearchBar';
+import SearchAutocomplete from './SearchAutoComplete';
 
-const Sidebar = ({ isVisible, toggle }) => {
+const Sidebar : React.FC = ({ isVisible, toggle }) => {
   return (
     <Drawer
       anchor="right"
@@ -25,13 +26,15 @@ const Sidebar = ({ isVisible, toggle }) => {
           <CloseIcon />
         </IconButton>
         <Typography variant="h6" gutterBottom>
-          Sidebar
+         Search  🔍
         </Typography>
         <Typography variant="body1">
-          This is a transparent sidebar overlay with white text and a white dashed border.
+          🛰️ 🛰️ 🛰️ 🛰️ 🛰️ 🛰️ 🛰️ 🛰️ 🛰️ 
         </Typography>
+        
       </Box>
-      <AutocompleteSearchBar />
+      {/* <AutocompleteSearchBar /> */}
+      <SearchAutocomplete />
     </Drawer>
   );
 };

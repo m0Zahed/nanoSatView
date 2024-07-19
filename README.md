@@ -5,7 +5,8 @@
 
 *nanoSatView* is designed with a robust architecture to visualize satellite orbits around the Earth, leveraging several modern technologies. Below is a detailed explanation of the architecture:
 
-![Architecture](./assets/Architecture.png)
+![Architecture](https://github.com/user-attachments/assets/0de7b8d7-63e4-479e-b54d-8a9663020d25)
+
 
 ## Components
 

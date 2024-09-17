@@ -1,20 +1,9 @@
 # nanoSatView
+*nanoSatView* is an advanced application designed to visualize satellite orbits around the Earth. Leveraging the power of ThreeJS for 3D rendering, NextJS Generative UI for a dynamic and responsive user interface, and a robust .NET backend, Nano SAT VIEW offers a comprehensive solution for satellite orbit visualization.
 
-Nano SAT VIEW is an advanced application designed to visualize satellite orbits around the Earth. Leveraging the power of ThreeJS for 3D rendering, NextJS Generative UI for a dynamic and responsive user interface, and a robust .NET backend, Nano SAT VIEW offers a comprehensive solution for satellite orbit visualization.
+## Architecture
 
-**Key features include**:
-
-- ThreeJS Integration: Utilizes ThreeJS to render realistic and interactive 3D representations of satellite orbits.
-- NextJS Generative UI: Provides a modern, intuitive, and responsive user interface for seamless interaction.
-- .NET Backend: Fetches and processes Two-Line Element sets (TLEs), computes the propagated orbits, and sends the data to the renderer for visualization.
-
-With Nano SAT VIEW, users can effortlessly explore and analyze satellite trajectories, making it an essential tool for researchers, educators, and space enthusiasts.
-
----
-
-# NanoSatView Architecture
-
-Nano SAT VIEW is designed with a robust architecture to visualize satellite orbits around the Earth, leveraging several modern technologies. Below is a detailed explanation of the architecture:
+*nanoSatView* is designed with a robust architecture to visualize satellite orbits around the Earth, leveraging several modern technologies. Below is a detailed explanation of the architecture:
 
 ![Architecture](./assets/Architecture.png)
 
@@ -25,14 +14,13 @@ Nano SAT VIEW is designed with a robust architecture to visualize satellite orbi
 - **Technology**: Uses ThreeJS for interactive and realistic 3D graphics.
 
 ### 2. Information Engine
-- **Role**: Acts as a central processing unit for various types of requests related to satellite data.
+- **Role**: Acts as the frontend for various types of requests related to satellite data.
 - **Functions**:
   - Converts TLEs to ECI using SGP4.
   - Converts ECI to Geodetic coordinates.
   - Determines the look-up angle based on location and satellite in orbit.
   - Fetches satellite TLEs and propagates them around the globe.
   - Converts addresses to Geodetic coordinates.
-  - Converts Geodetic coordinates to elevation.
 
 ### 3. Backend
 - **Infrastructure**: Runs on Kubernetes to manage containerized applications.

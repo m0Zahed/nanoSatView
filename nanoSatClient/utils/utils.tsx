@@ -1,4 +1,12 @@
+import Satellite from '@/models/satellite.ts';
 import * as THREE from 'three';
+// import satelliteList from '@/assets/satellite_list.json';
+function getSatelliteNames() {
+  const filteredList = satelliteList.filter((sat: any) => sat.name.toLowerCase() !== 'unknown satellite');
+  const satellites = filteredList.map((sat: any) => new Satellite(sat));
+  return satellites.map(sat => ({ name: sat.name }));
+}
+
 
 /**
  * @brief Returns the Mesh object in the group
@@ -59,4 +67,4 @@ const addWireframe = (group : THREE.Group = new THREE.Group(), geometry : THREE.
     group.add(wireframe);
 }
 
-export { getMeshByName, addMeridianAndEquator, addWireframe };
+export { getSatelliteNames, getMeshByName, addMeridianAndEquator, addWireframe };

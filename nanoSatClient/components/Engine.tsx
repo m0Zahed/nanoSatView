@@ -38,6 +38,7 @@ const Engine: React.FC = () => {
   const managerRef = useRef<frameManager | null>(null);  
   const controlsRef = useRef<OrbitControls | null>(null);
   const initialisedScene = useRef<boolean>(false);
+
   // -------------------------- FUNCTIONS ------------------------------------
   
   const initialiseWorld = (length=7) => {
@@ -165,6 +166,7 @@ const Engine: React.FC = () => {
       console.error('Error fetching TLE data:', error);
     }
   };
+
   // -------------------------- MAIN ------------------------------------
 
   useEffect(() => {

@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("nanoSatAPI")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+cfd0fc2e6ebdc01124f33c1ff09cb262ce7861a2")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
 [assembly: System.Reflection.AssemblyProductAttribute("nanoSatAPI")]
 [assembly: System.Reflection.AssemblyTitleAttribute("nanoSatAPI")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

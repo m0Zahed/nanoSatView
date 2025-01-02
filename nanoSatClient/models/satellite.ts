@@ -61,4 +61,6 @@ export default class Satellite {
       associated_satellites: this.associated_satellites,
     };
   }
+  
+
 }

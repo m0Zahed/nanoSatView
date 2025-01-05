@@ -63,7 +63,7 @@ function SearchAutocomplete({ addSatellite }) {
       inputRef.current.focus();
     }
   }, []);
-
+  // queries for 
   const getSuggestions = async value => {
     try {
       const searchParameters = {

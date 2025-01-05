@@ -5,6 +5,13 @@ import SearchAutocomplete from './SearchAutoComplete';
 import SidebarSnippet from './SidebarSnippet';
 import Satellite from '@/models/satellite';
 
+/**
+ * @brief the Sidebar component will be used to search for NanoSats and Sats alike. 
+ *
+ * @p Once the search is complete it will add to currently tracked sattelites. 
+ *    This has no close button and instead the user will have to click in the area outside the right bar.    
+ */
+
 interface SidebarProps {
   isVisible: boolean;
   toggle: () => void;
@@ -16,29 +23,36 @@ interface TrackedSat {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ isVisible, toggle }) => {
-  const [trackedSat, setTrackedSat] = useState<TrackedSat[]>([]);
+  const [trackedSatList, setTrackedSat] = useState<TrackedSat[]>([]);
   
   /**
    * @brief Add non-duplicate values to the tracked satellite array `trackedSat`
-    */
+   */
   const addTrackedSatellites = (satName: string, status: string) => {
+
     setTrackedSat(prevTrackedSat => {
+      // If satellite is not present add it to the trackedSatList
       if (!prevTrackedSat.some(sat => sat.name === satName)) {
         return [...prevTrackedSat, { name: satName, status: status }];
       }
+
       console.log(`Satellite ${satName} is already being tracked.`);
       return prevTrackedSat;
+
     });
+
   };
 
   const removeTrackedSatellite = (satName: string) => {
     setTrackedSat(prevTrackedSat => {
+
       const existingSat = prevTrackedSat.some(sat => sat.name === satName);
 
       if (existingSat) {
         // Remove the satellite if it already exists
         return prevTrackedSat.filter(sat => sat.name !== satName);
       }
+
       return prevTrackedSat;
     });
   }
@@ -83,8 +97,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible, toggle }) => {
           Tracking Satellites  
         </Typography>
 
-        {trackedSat.length ? 
-          trackedSat.map( (satellite) => (
+        {trackedSatList.length ? 
+          trackedSatList.map( (satellite) => (
             <SidebarSnippet SatName={satellite.name} Status={satellite.status} removeSat={removeTrackedSatellite} />)) : 
             <SidebarSnippet SatName="N/A" Status="Add Satellites to Track" removeSat={()=>(console.log("Cannot remove empty Satellite!"))}/>}
       

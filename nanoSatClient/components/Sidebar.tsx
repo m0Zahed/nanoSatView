@@ -4,7 +4,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import SearchAutocomplete from './SearchAutoComplete';
 import SidebarSnippet from './SidebarSnippet';
 import Satellite from '@/models/satellite';
-
+import satellite_search_params from '../interfaces/sat_data_intf'
 /**
  * @brief the Sidebar component will be used to search for NanoSats and Sats alike. 
  *
@@ -17,13 +17,8 @@ interface SidebarProps {
   toggle: () => void;
 }
 
-interface TrackedSat {
-  name: string;
-  status: string;
-}
-
 const Sidebar: React.FC<SidebarProps> = ({ isVisible, toggle }) => {
-  const [trackedSatList, setTrackedSat] = useState<TrackedSat[]>([]);
+  const [trackedSatList, setTrackedSat] = useState<satellite_search_params[]>([]);
   
   /**
    * @brief Add non-duplicate values to the tracked satellite array `trackedSat`

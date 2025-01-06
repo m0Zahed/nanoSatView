@@ -1,12 +1,15 @@
 const fs = require('fs/promises');
 const client = require('./config.js');
 
+
 // Schema definition for the 'sats' collection
+// Keep this schema the same as the one in nanoSat client
 let satSchema = {
   'name': 'sats',
   'fields': [
     {'name': 'name', 'type': 'string'},
-    {'name': 'status', 'type': 'string'}
+    {'name': 'status', 'type': 'string'},
+    {'name': 'norad_cat_id', 'type': 'number'}
   ],
 };
 
@@ -32,7 +35,7 @@ async function processAndIndexSatellites() {
       .reduce((acc, current) => {
         const x = acc.find(item => item.name === current.name);
         if (!x) {
-          acc.push({ name: current.name, status: current.status });
+          acc.push({ name: current.name, status: current.status, norad_cat_id: current.norad_cat_id});
         }
         return acc;
       }, []);

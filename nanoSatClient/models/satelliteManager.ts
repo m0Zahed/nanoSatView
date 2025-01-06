@@ -1,18 +1,65 @@
 import Satellite from "./satellite";
+import { satellite_search_params }  from '../interfaces/sat_data_intf'
 
 export default class SatelliteManager {
+  
+  iss_test_sat : satellite_search_params;
+
+  Celestrak_API : string;
+  earthRadius : number; 
+  scaleFactor : number;
+  altitude : number;
 
   constructor() {
+    //environment variable for drawing the orbit 
+    earthRadius = 5;
+    scaleFactor = earthRadius / 6371; // 6371 is the approximate radius of the Earth in km
+    altitude = 0.314; // scaled altitude for ISS
+
+    // To simply test 
+    iss_test_sat = {name: "ISS", status: "active", norad_cat_id: 25544};
+    Celestrak_API_url = `https://celestrak.org/NORAD/elements/gp.php?CATNR=${iss_test_sat.norad_cat_id}&FORMAT=TLE`;
+  }
+ 
+  public async fetch_TLEs(norad_cat_id : number) {
+
+      const response = await axios.get(Celestrak_API_url);
+      console.log('TLE Response:', response.data);
+      return response.data;
+    
+  } 
+
+  public add_satellite_to_scene(active_sat : Satellite) : void {
+    const { line1, line2 } = fetch_TLEs();
+    const satrec = satellite.twoline2satrec(line1, line2);
+    const positions = getPosition(1400); 
+    active_sat.generateOrbitGeometry(positions);
+    active_sat.generateSatelliteMarker();
     
   }
+
+  public plot_satellite(active_sat : Satellite) : void {
+    try {
+      active_sat.plot_orbit(); 
+      active_sat.set_updater();
+    } catch (error) {
+      console.error("Error checking for updates:", error);
+    }
+  }
   
-  public async fetch_TLEs() : void {
+  /**
+   * @brief Hides the satellite by removing the object from the scene 
+   */
+  public hide_satellite_from_scene(active_sat : Satellite) : void {
+    active_sat.hide();     
+  }
 
-      const response = await axios.get('https://api.wheretheiss.at/v1/satellites/25544/tles');
-      console.log('TLE Response:', response.data);
-      const { line1, line2 } = response.data;
-
-  } 
+  /**
+   * @brief Stops rednering the satellite and deletes the position generated positions array
+   */
+  public remove_satellite_from_scene(active_sat : Satellite) : void {
+    active_sat.remove();     
+  }
 
   // TODO This is simply a test function. Generalize this function to be able to plot any satellites TLE
   // Propagate the orbit of the ISS and then plot it.

@@ -19,7 +19,16 @@ import frameManager from '@/models/frameManager.ts';
 import planet from '@/models/planet.ts';
 import sunLight from '@/models/sunLight';
 
-const Engine: React.FC = () => {
+/**
+ * @brief The engine will take care of all the rendering 
+ *        - Globe
+ *        - axes
+ *        - Rotations
+ *        - Orbits
+ *        - Satellites
+ *
+ */
+const Engine: React.FC = ({ trackedSatList, setTrackedSat }) => {
 
   // Wait for the DOM and Browser window to get initialised.
   // Why? wierd bug happens with initialisation where the renderer is mounted twice,

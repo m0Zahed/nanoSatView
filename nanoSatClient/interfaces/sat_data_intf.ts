@@ -5,9 +5,12 @@
 /**
  * The following interface defines the information that the typesense shall return 
  * The norad_id can be used to query for satellite TLEs using CleStrak, 
+ *
+ *
  */
-export default interface satellite_search_params {
+export interface satellite_search_params {
   name: string;
   status: string;
-  norad_id: number;
+  norad_cat_id: number;
 }
+

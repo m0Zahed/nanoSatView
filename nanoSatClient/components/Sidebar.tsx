@@ -4,38 +4,36 @@ import CloseIcon from '@mui/icons-material/Close';
 import SearchAutocomplete from './SearchAutoComplete';
 import SidebarSnippet from './SidebarSnippet';
 import Satellite from '@/models/satellite';
-import satellite_search_params from '../interfaces/sat_data_intf'
+import { satellite_search_params } from '../interfaces/sat_data_intf'
+
 /**
  * @brief the Sidebar component will be used to search for NanoSats and Sats alike. 
  *
  * @p Once the search is complete it will add to currently tracked sattelites. 
  *    This has no close button and instead the user will have to click in the area outside the right bar.    
  */
-
 interface SidebarProps {
   isVisible: boolean;
   toggle: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isVisible, toggle }) => {
-  const [trackedSatList, setTrackedSat] = useState<satellite_search_params[]>([]);
+const Sidebar: React.FC<SidebarProps> = ({ trackedSatList, setTrackedSat, isVisible, toggle }) => {
   
   /**
    * @brief Add non-duplicate values to the tracked satellite array `trackedSat`
    */
-  const addTrackedSatellites = (satName: string, status: string) => {
+  const addTrackedSatellites = (selectedSat : satellite_search_params) => {
 
     setTrackedSat(prevTrackedSat => {
       // If satellite is not present add it to the trackedSatList
       if (!prevTrackedSat.some(sat => sat.name === satName)) {
-        return [...prevTrackedSat, { name: satName, status: status }];
+        return [...prevTrackedSat, selectedSat];
       }
 
       console.log(`Satellite ${satName} is already being tracked.`);
       return prevTrackedSat;
 
     });
-
   };
 
   const removeTrackedSatellite = (satName: string) => {

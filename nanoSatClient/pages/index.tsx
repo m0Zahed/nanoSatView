@@ -11,6 +11,7 @@ const inter = Inter({ subsets: ['latin'] });
 
 export default function Home() {
   const [isSidebarVisible, setSidebarVisible] = useState(false);
+  const [trackedSatList, setTrackedSat] = useState<satellite_search_params[]>([]);
 
   const toggleSidebar = () => {
     setSidebarVisible(!isSidebarVisible);
@@ -42,8 +43,8 @@ export default function Home() {
         >
           {isSidebarVisible ? '' : '🔍'}
         </Button>
-        <Engine />
-        <Sidebar isVisible={isSidebarVisible} toggle={toggleSidebar} />
+        <Engine  trackedSatList={trackedSatList} setTrackedSat={setTrackedSat} />
+        <Sidebar trackedSatList={trackedSatList} setTrackedSat={setTrackedSat} isVisible={isSidebarVisible} toggle={toggleSidebar} />
       </div>
     </>
   );

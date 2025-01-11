@@ -1,5 +1,6 @@
 import Typesense from 'typesense';
 
+// TODO Add a configuration to set the IP address
 class TypesenseClientSingleton {
   private static instance: Typesense.Client | null = null;
 

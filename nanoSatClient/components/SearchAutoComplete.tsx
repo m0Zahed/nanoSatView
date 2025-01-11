@@ -5,6 +5,7 @@ import Paper from '@mui/material/Paper';
 import MenuItem from '@mui/material/MenuItem';
 import { styled } from '@mui/material/styles';
 import TypesenseClientSingleton from '@/utils/TypesenseClientSingleton';
+import { satellite_search_params }  from '../interfaces/sat_data_intf'
 
 const Container = styled('div')({
   position: 'relative',
@@ -64,6 +65,7 @@ function SearchAutocomplete({ addSatellite }) {
     }
   }, []);
 
+  // queries by the satellite name 
   const getSuggestions = async value => {
     try {
       const searchParameters = {
@@ -119,7 +121,14 @@ function SearchAutocomplete({ addSatellite }) {
   };
 
   const onSuggestionSelected = (event, { suggestion, suggestionValue, suggestionIndex, sectionIndex, method }) => {
-    addSatellite(suggestion.name, suggestion.status);
+
+    const sat : satellite_search_params = { 
+      name: suggestion.name, 
+      status: suggestion.status, 
+      norad_cat_id: suggestion.norad_cat_id,
+      }; 
+    addSatellite(sat);
+
   };
 
   return (

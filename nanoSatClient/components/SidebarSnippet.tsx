@@ -11,6 +11,10 @@ const TransparentCard = styled(Card)(({ theme }) => ({
   cursor: 'pointer',
 }));
 
+/**
+ * The following interface will be used to create and used in the 
+ *
+ */
 interface SidebarSnippetProps {
   SatName: string;
   Status: string;

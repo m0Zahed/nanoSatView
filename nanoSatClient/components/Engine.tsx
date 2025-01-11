@@ -18,6 +18,7 @@ import * as satellite from 'satellite.js';
 import frameManager from '@/models/frameManager.ts';
 import planet from '@/models/planet.ts';
 import sunLight from '@/models/sunLight';
+import satelliteManager from '@/models/satelliteManager.ts'
 
 /**
  * @brief The engine will take care of all the rendering 
@@ -49,7 +50,7 @@ const Engine: React.FC = ({ trackedSatList, setTrackedSat }) => {
   const managerRef = useRef<frameManager | null>(null);  
   const controlsRef = useRef<OrbitControls | null>(null);
   const initialisedScene = useRef<boolean>(false);
-
+  const satManagerRef = useRef<>();
   // -------------------------- FUNCTIONS ------------------------------------
   
   const initialiseWorld = (length=7) => {
@@ -104,7 +105,15 @@ const Engine: React.FC = ({ trackedSatList, setTrackedSat }) => {
     controlsRef.current = new OrbitControls(cameraRef.current, rendererRef.current.domElement);
     controlsRef.current.enableZoom = true;
   };
-
+  
+  /**
+   * The following code syncs the Engine with the sidebar.
+   */
+  useEffect(() => {
+    trackedSatList.forEach(satellite => {
+     satManagerRef.current.has(satellite.name) ? satManagerRef.current.update(satellite.name) : satManagerRef.current.remove(satellite.name);
+    }); 
+    }, [trackedSatList]) 
 
   // -------------------------- MAIN ------------------------------------
 

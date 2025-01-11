@@ -4,11 +4,7 @@ import { satellite_search_params }  from '../interfaces/sat_data_intf'
 export default class SatelliteManager {
   
   iss_test_sat : satellite_search_params;
-
-  Celestrak_API : string;
-  earthRadius : number; 
-  scaleFactor : number;
-  altitude : number;
+  tracked_satellites : satellite[];
 
   constructor() {
     //environment variable for drawing the orbit 
@@ -21,31 +17,35 @@ export default class SatelliteManager {
     Celestrak_API_url = `https://celestrak.org/NORAD/elements/gp.php?CATNR=${iss_test_sat.norad_cat_id}&FORMAT=TLE`;
   }
  
-  public async fetch_TLEs(norad_cat_id : number) {
+  public update(sat_name : string) {
+    try{ 
+      const found_sat : satellite = tracked_satellites.find( sat => sat.name === sat_name);   
+      if (!found_sat) {
+        throw "Satellite not found in tracked list, aborting update.";
+      }
+  
+      found_sat.fetchTLEs();
+       
+       
 
-      const response = await axios.get(Celestrak_API_url);
-      console.log('TLE Response:', response.data);
-      return response.data;
+    } catch(error) {
+      console.error('Error in updating the satellite details:', error);
+    }
+  }
+
+  public remove() {
     
+  }
+
+
+  public has(sat_name : string) {
+
   } 
 
   public add_satellite_to_scene(active_sat : Satellite) : void {
-    const { line1, line2 } = fetch_TLEs();
-    const satrec = satellite.twoline2satrec(line1, line2);
-    const positions = getPosition(1400); 
-    active_sat.generateOrbitGeometry(positions);
-    active_sat.generateSatelliteMarker();
     
   }
 
-  public plot_satellite(active_sat : Satellite) : void {
-    try {
-      active_sat.plot_orbit(); 
-      active_sat.set_updater();
-    } catch (error) {
-      console.error("Error checking for updates:", error);
-    }
-  }
   
   /**
    * @brief Hides the satellite by removing the object from the scene 
@@ -135,4 +135,12 @@ export default class SatelliteManager {
       console.error('Error fetching TLE data:', error);
     }
   };
+
+  public show() {
+
+  }
+
+  public hide() {
+     
+  }
 }

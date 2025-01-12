@@ -4,7 +4,11 @@ import { satellite_search_params }  from '../interfaces/sat_data_intf'
 export default class SatelliteManager {
   
   iss_test_sat : satellite_search_params;
-  tracked_satellites : satellite[];
+  tracked_satellites : Map<string, Satellite>;
+  earthRadius : number;
+  scaleFactor : number; 
+  altitude : number;
+  Celestrak_API_url : string;
 
   constructor() {
     //environment variable for drawing the orbit 
@@ -14,19 +18,21 @@ export default class SatelliteManager {
 
     // To simply test 
     iss_test_sat = {name: "ISS", status: "active", norad_cat_id: 25544};
-    Celestrak_API_url = `https://celestrak.org/NORAD/elements/gp.php?CATNR=${iss_test_sat.norad_cat_id}&FORMAT=TLE`;
+    Celestrak_API_url = `https://celestrak.org/NORAD/elements/gp.php?CATNR=${this.iss_test_sat.norad_cat_id}&FORMAT=TLE`;
   }
  
   public update(sat_name : string) {
     try{ 
-      const found_sat : satellite = tracked_satellites.find( sat => sat.name === sat_name);   
+      const found_sat = this.tracked_satellites.has(sat_name);
       if (!found_sat) {
         throw "Satellite not found in tracked list, aborting update.";
       }
-  
-      found_sat.fetchTLEs();
-       
-       
+      
+      // '!' added to ensure that the satellite is definitely found
+      const sat_data : Satellite = this.tracked_satellites.get(sat_name)!;
+      sat_data.fetch_TLEs();
+
+
 
     } catch(error) {
       console.error('Error in updating the satellite details:', error);

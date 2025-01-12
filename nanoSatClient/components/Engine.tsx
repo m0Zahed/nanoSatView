@@ -48,9 +48,9 @@ const Engine: React.FC = ({ trackedSatList, setTrackedSat }) => {
   const planetRef = useRef<planet | null>(null);
   const sunLightRef = useRef<sunLight | null>(null);
   const managerRef = useRef<frameManager | null>(null);  
+  const satManagerRef = useRef<satelliteManager | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const initialisedScene = useRef<boolean>(false);
-  const satManagerRef = useRef<>();
   // -------------------------- FUNCTIONS ------------------------------------
   
   const initialiseWorld = (length=7) => {
@@ -58,6 +58,7 @@ const Engine: React.FC = ({ trackedSatList, setTrackedSat }) => {
       planetRef.current = new planet(); 
       sunLightRef.current = new sunLight();
       managerRef.current = new frameManager(length, planetRef.current, sunLightRef.current);
+      satManagerRef.current = new satelliteManager();
 
       addMeridianAndEquator(planetRef.current.group);
       managerRef.current.addAllFramesToScene(sceneRef.current);
@@ -107,6 +108,7 @@ const Engine: React.FC = ({ trackedSatList, setTrackedSat }) => {
   };
   
   /**
+   * @brief The following is an update function that will be called when the trackedSatList is updated.
    * The following code syncs the Engine with the sidebar.
    */
   useEffect(() => {
@@ -124,7 +126,7 @@ const Engine: React.FC = ({ trackedSatList, setTrackedSat }) => {
     initialiseScene(mount);
     initialiseWorld();
     window.addEventListener('resize', handleResize);
-
+     
     // propagateISSOrbit();
     animate();
     // propagateISSOrbit();

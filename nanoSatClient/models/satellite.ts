@@ -1,5 +1,12 @@
 import * as THREE from 'three';
 import * as satellite from 'satellite.js';
+import axios from 'axios';
+
+// TLE Response Interface for the Celestrak API
+interface TLE_Response_Celestrak {
+  line1: string;
+  line2: string;
+}
 
 export default class Satellite {
   // Stuff in use
@@ -72,12 +79,27 @@ export default class Satellite {
     };
   }
 
-  public async fetch_TLEs() : any {
+  public async fetch_TLEs(): Promise<void> {
+    try {
+      const response = await axios.get<TLEResponse>(this.Celestrak_API_url);
+      const { line1, line2 } = response.data;
       
-    const { line1, line2 } = await axios.get(Celestrak_API_url); 
-    console.log('TLE Response:', response.data);
-    this.satrec = satellite.twoline2satrec(line1, line2);
-  } 
+      console.log('TLE Response:', response.data);
+      
+      if (!line1 || !line2) {
+        throw new Error('Invalid TLE data received');
+      }
+      
+      this.satrec = satellite.twoline2satrec(line1, line2);
+      
+      if (!this.satrec) {
+        throw new Error('Failed to parse TLE data');
+      }
+    } catch (error) {
+      console.error('Error fetching TLE data:', error);
+      throw error;
+    }
+  }
 
   private _generate_positions(number_of_points : number) {
 

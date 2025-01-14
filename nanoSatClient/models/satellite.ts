@@ -81,7 +81,7 @@ export default class Satellite {
 
   public async fetch_TLEs(): Promise<void> {
     try {
-      const response = await axios.get<TLEResponse>(this.Celestrak_API_url);
+      const response = await axios.get<TLE_Response_Celestrak>(this.Celestrak_API_url);
       const { line1, line2 } = response.data;
       
       console.log('TLE Response:', response.data);
@@ -107,7 +107,7 @@ export default class Satellite {
     const currentDate = new Date();
     for (let i = 0; i < number_of_points; i++) {
       const time = new Date(currentDate.getTime() + i * 60000);
-      const positionAndVelocity = satellite.propagate(satrec, time);
+      const positionAndVelocity = satellite.propagate(this.satrec, time);
       const positionEci = positionAndVelocity.position;
 
       if (positionEci) {
@@ -115,7 +115,7 @@ export default class Satellite {
         const positionGd = satellite.eciToGeodetic(positionEci, gmst);
         const longitude = positionGd.longitude * (180 / Math.PI);
         const latitude = positionGd.latitude * (180 / Math.PI);
-        const height = (positionGd.height * scaleFactor) + earthRadius + altitude; // Scale height
+        const height = (positionGd.height * this.scaleFactor) + this.earthRadius + this,altitude; // Scale height
 
         const x = height * Math.cos(latitude * Math.PI / 180) * Math.cos(longitude * Math.PI / 180);
         const y = height * Math.cos(latitude * Math.PI / 180) * Math.sin(longitude * Math.PI / 180);
@@ -126,7 +126,7 @@ export default class Satellite {
     }
   } 
   
-  private _generate_line_object(): THREE.Line | null {
+  private _generate_line_object() : void {
     try {
       if (!this.positions || this.positions.length === 0) {
         console.warn("Positions array is empty or undefined. No line generated.");
@@ -140,45 +140,63 @@ export default class Satellite {
 
     } catch (error) {
       console.error("Error generating line object:", error);
-      return null;  // Return null if an error occurs
     }
   }
   
-  private _generate_marker() : THREE.Mesh { 
+  /**
+   * TODO: Create several more functions to select different 3D objects
+   * for the marker.
+   */
+  private _generate_marker() : void { 
     try {
       const MarkerGeometry = new THREE.SphereGeometry(0.1, 32, 32);
       const MarkerMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
       this.MarkerMesh = new THREE.Mesh(MarkerGeometry, MarkerMaterial);
     } catch (error) {
-       
+      console.error("Error generating line object:", error);
     }
 
   }
+  
+  /**
+   * @brief Generates the orbit line and position marker
+  * @see You can modify the number of positions you'd like to 
+  */
+  public create_3d_models() : void {
+    // Generates a specified number of points 
+    this._generate_positions(1400); 
+
+    // Generates the orbit 
+    this._generate_line_object()
+
+    // Generates the position market
+    this._generate_marker()
+  }
+  
+  private position_updater() {
+      const time = new Date();
+      const positionAndVelocity = satellite.propagate(satrec, time);
+      const positionEci = positionAndVelocity.position;
+
+      if (positionEci) {
+        const gmst = satellite.gstime(time);
+        const positionGd = satellite.eciToGeodetic(positionEci, gmst);
+        const longitude = positionGd.longitude * (180 / Math.PI);
+        const latitude = positionGd.latitude * (180 / Math.PI);
+        const height = (positionGd.height * scaleFactor) + earthRadius + altitude; // Scale height
+
+        const x = height * Math.cos(latitude * Math.PI / 180) * Math.cos(longitude * Math.PI / 180);
+        const y = height * Math.cos(latitude * Math.PI / 180) * Math.sin(longitude * Math.PI / 180);
+        const z = height * Math.sin(latitude * Math.PI / 180);
+        
+        const vector = new THREE.Vector3(x,y,z);
+        vector.applyAxisAngle(new THREE.Vector3(1,0,0), - Math.PI / 2);
+        issMesh.position.set(vector.x, vector.y, vector.z);
+      }
+  }
 
   public show(){
-      const updateISSPosition = () => {
-        const time = new Date();
-        const positionAndVelocity = satellite.propagate(satrec, time);
-        const positionEci = positionAndVelocity.position;
-
-        if (positionEci) {
-          const gmst = satellite.gstime(time);
-          const positionGd = satellite.eciToGeodetic(positionEci, gmst);
-          const longitude = positionGd.longitude * (180 / Math.PI);
-          const latitude = positionGd.latitude * (180 / Math.PI);
-          const height = (positionGd.height * scaleFactor) + earthRadius + altitude; // Scale height
-
-          const x = height * Math.cos(latitude * Math.PI / 180) * Math.cos(longitude * Math.PI / 180);
-          const y = height * Math.cos(latitude * Math.PI / 180) * Math.sin(longitude * Math.PI / 180);
-          const z = height * Math.sin(latitude * Math.PI / 180);
-          
-          const vector = new THREE.Vector3(x,y,z);
-          vector.applyAxisAngle(new THREE.Vector3(1,0,0), - Math.PI / 2);
-          issMesh.position.set(vector.x, vector.y, vector.z);
-        }
-      };
-
-      setInterval(updateISSPosition, 1000);
+      setInterval(this.position_updater, 1000);
   }
 }
   //

@@ -51,6 +51,8 @@ const Engine: React.FC = ({ trackedSatList, setTrackedSat }) => {
   const satManagerRef = useRef<satelliteManager | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const initialisedScene = useRef<boolean>(false);
+
+
   // -------------------------- FUNCTIONS ------------------------------------
   
   const initialiseWorld = (length=7) => {
@@ -58,7 +60,7 @@ const Engine: React.FC = ({ trackedSatList, setTrackedSat }) => {
       planetRef.current = new planet(); 
       sunLightRef.current = new sunLight();
       managerRef.current = new frameManager(length, planetRef.current, sunLightRef.current);
-      satManagerRef.current = new satelliteManager();
+      satManagerRef.current = new satelliteManager(sceneRef.current);
 
       addMeridianAndEquator(planetRef.current.group);
       managerRef.current.addAllFramesToScene(sceneRef.current);
@@ -113,7 +115,7 @@ const Engine: React.FC = ({ trackedSatList, setTrackedSat }) => {
    */
   useEffect(() => {
     trackedSatList.forEach(satellite => {
-     satManagerRef.current.has(satellite.name) ? satManagerRef.current.update(satellite.name) : satManagerRef.current.remove(satellite.name);
+     satManagerRef.current.has(satellite.name) ? satManagerRef.current.update(satellite.name) : satManagerRef.current.add(satellite.name);
     }); 
     }, [trackedSatList]) 
 

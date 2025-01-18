@@ -173,7 +173,10 @@ export default class Satellite {
     this._generate_marker()
   }
   
-  private position_updater() {
+  /**
+   * @ Initializes the marker on the orbit 
+   */
+  public init() {
       const time = new Date();
       const positionAndVelocity = satellite.propagate(satrec, time);
       const positionEci = positionAndVelocity.position;
@@ -191,13 +194,24 @@ export default class Satellite {
         
         const vector = new THREE.Vector3(x,y,z);
         vector.applyAxisAngle(new THREE.Vector3(1,0,0), - Math.PI / 2);
-        issMesh.position.set(vector.x, vector.y, vector.z);
+        this.MarkerMesh.position.set(vector.x, vector.y, vector.z);
       }
   }
-
-  public show(){
-      setInterval(this.position_updater, 1000);
+  
+  /**
+   * @returns the orbit object
+   */
+  public get_orbit() : THREE.Object3D {
+    return this.orbitLine;
   }
+
+  /**
+   * @returns the marker object
+   */
+  public get_marker() : THREE.Object3D {
+    return this.MarkerMesh;
+  }
+  
 }
   //
   // // TODO This is simply a test function. Generalize this function to be able to plot any satellites TLE

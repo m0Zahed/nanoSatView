@@ -79,7 +79,7 @@ export default class Satellite {
     };
   }
 
-  public async fetch_TLEs(): Promise<void> {
+  public async fetch_TLEs(): Promise<boolean> {
     try {
       const response = await axios.get<TLE_Response_Celestrak>(this.Celestrak_API_url);
       const { line1, line2 } = response.data;

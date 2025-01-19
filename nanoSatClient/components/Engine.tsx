@@ -115,7 +115,9 @@ const Engine: React.FC = ({ trackedSatList, setTrackedSat }) => {
    */
   useEffect(() => {
     trackedSatList.forEach(satellite => {
-     satManagerRef.current.has(satellite.name) ? satManagerRef.current.update(satellite.name) : satManagerRef.current.add(satellite.name);
+     satManagerRef.current.has(satellite.name) ? 
+       satManagerRef.current.update(satellite.name) 
+       : satManagerRef.current.add(satellite.name);
     }); 
     }, [trackedSatList]) 
 

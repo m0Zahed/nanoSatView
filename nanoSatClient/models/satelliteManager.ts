@@ -2,14 +2,14 @@ import Satellite from "./satellite";
 import * as THREE from 'three';
 import { satellite_search_params }  from '../interfaces/sat_data_intf'
 
-interface Satellite_Details extends satellite_search_params {
+interface Satellite_Details extends Satellite {
    checked : boolean; 
 } 
 
 export default class SatelliteManager {
   
   iss_test_sat : satellite_search_params;
-  tracked_satellites : Map<string, Satellite>;
+  tracked_satellites : Map<string, Satellite_Details>;
   earthRadius : number;
   scaleFactor : number; 
   altitude : number;
@@ -30,10 +30,6 @@ export default class SatelliteManager {
  
   public add(sat_name : string) {
     try{ 
-      const found_sat = this.tracked_satellites.has(sat_name);
-      if (!found_sat) {
-        throw "Satellite not found in tracked list, aborting update.";
-      }
       
       // '!' added to ensure that the satellite is definitely found
       const selected_sat : Satellite = this.tracked_satellites.get(sat_name)!;
@@ -41,12 +37,35 @@ export default class SatelliteManager {
       selected_sat.create_3d_models(); 
       selected_sat.init();
       this.show(selected_sat);
+      selected_sat.checked = true;
 
     } catch(error) {
       console.error('Error in updating the satellite details:', error);
     }
   }
   
+  /**
+   * @brief supposed to re
+   */
+  public update(sat_name : string) {
+    try{ 
+      
+      // '!' added to ensure that the satellite is definitely found
+      const selected_sat : Satellite = this.tracked_satellites.get(sat_name)!;
+      selected_sat.fetch_TLEs() ? {
+        selected_sat.create_3d_models(); 
+        selected_sat.init();
+        this.show(selected_sat);
+        selected_sat.checked = true;
+      } : {
+       console.log("The TLE's have no updates.");
+        
+      }
+
+    } catch(error) {
+      console.error('Error in updating the satellite details:', error);
+    }
+  }
 
   public remove() {
     
@@ -63,6 +82,8 @@ export default class SatelliteManager {
    * @brief Hides the satellite by removing the object from the scene 
    */
   public hide(active_sat : Satellite) : void {
+    this.mainScene.remove(active_sat.get_orbit());  
+    this.mainScene.remove(active_sat.get_marker());  
   }
 
   /**

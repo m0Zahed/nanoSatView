@@ -131,9 +131,7 @@ const Engine: React.FC = ({ trackedSatList, setTrackedSat }) => {
     initialiseWorld();
     window.addEventListener('resize', handleResize);
      
-    // propagateISSOrbit();
     animate();
-    // propagateISSOrbit();
 
     // Cleanup function, 
     return () => {

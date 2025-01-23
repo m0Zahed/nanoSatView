@@ -27,7 +27,16 @@ export default class SatelliteManager {
     Celestrak_API_url = `https://celestrak.org/NORAD/elements/gp.php?CATNR=${this.iss_test_sat.norad_cat_id}&FORMAT=TLE`;
     this.mainScene = scene;
   }
- 
+  
+  /**
+   * @brief This will be ran before update and add, NECESSARY STEP!
+   */
+  public reset_tracked_sat_list() {
+    this.tracked_satellites.forEach( (key, value) => {
+      value.checked = false; 
+    });
+  }
+
   public add(sat_name : string) {
     try{ 
       
@@ -52,23 +61,33 @@ export default class SatelliteManager {
       
       // '!' added to ensure that the satellite is definitely found
       const selected_sat : Satellite = this.tracked_satellites.get(sat_name)!;
-      selected_sat.fetch_TLEs() ? {
+      if(selected_sat.fetch_TLEs()) {
         selected_sat.create_3d_models(); 
         selected_sat.init();
         this.show(selected_sat);
         selected_sat.checked = true;
-      } : {
+      } else {
        console.log("The TLE's have no updates.");
-        
       }
-
     } catch(error) {
       console.error('Error in updating the satellite details:', error);
     }
   }
 
-  public remove() {
-    
+  private _remove(sat_nmae  : string) {
+      Satellite = this.tracked_satellites.delete(sat_name)!;
+  }
+  
+  /**
+   * @brief Called to remove all unchecked
+   */
+  public clean() {
+    this.tracked_satellites.forEach((key, value) => {
+      if(!value.checked)
+      {
+        this.tracked_satellites.delete(key);
+      }
+    });
   }
 
   /**

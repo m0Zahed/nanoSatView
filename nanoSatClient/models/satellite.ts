@@ -41,6 +41,7 @@ export default class Satellite {
   positions : THREE.Vector3[];
   MarkerMesh : THREE.Mesh;
   orbitLine : THREE.Line;
+  TLE_lines : TLE_Response_Celestrak; 
   satrec : any; 
 
   /**
@@ -78,12 +79,24 @@ export default class Satellite {
       associated_satellites: this.associated_satellites,
     };
   }
-
+  
+  /**
+   * @brief Fetches the TLEs and returns true if the TLE's have been updated.
+   */
   public async fetch_TLEs(): Promise<boolean> {
+    const to_return = true;
     try {
+
       const response = await axios.get<TLE_Response_Celestrak>(this.Celestrak_API_url);
-      const { line1, line2 } = response.data;
+      if(response === this.TLE_lines) {
+        to_return = false;
+      }
+      else {
+        this.TLE_lines = response;
+      }
       
+      const { line1, line2 } = this.TLE_lines;
+     
       console.log('TLE Response:', response.data);
       
       if (!line1 || !line2) {
@@ -95,6 +108,8 @@ export default class Satellite {
       if (!this.satrec) {
         throw new Error('Failed to parse TLE data');
       }
+
+      return to_return;
     } catch (error) {
       console.error('Error fetching TLE data:', error);
       throw error;

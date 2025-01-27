@@ -114,13 +114,15 @@ const Engine: React.FC = ({ trackedSatList, setTrackedSat }) => {
    * The following code syncs the Engine with the sidebar.
    */
   useEffect(() => {
-    trackedSatList.current.reset_tracked_sat_list();
-    trackedSatList.forEach(satellite => {
-     satManagerRef.current.has(satellite.name) ? 
-       satManagerRef.current.update(satellite.name) 
-       : satManagerRef.current.add(satellite.name);
-    }); 
-    trackedSatList.clean();
+    if(satManagerRef.current) {
+      satManagerRef.current.reset_tracked_sat_list();
+      trackedSatList?.forEach(satellite => {
+         satManagerRef.current.has(satellite.name) ? 
+           satManagerRef.current.update(satellite) 
+           : satManagerRef.current.add(satellite);
+      }); 
+      satManagerRef.current?.clean();
+    }
     }, [trackedSatList]) 
 
   // -------------------------- MAIN ------------------------------------

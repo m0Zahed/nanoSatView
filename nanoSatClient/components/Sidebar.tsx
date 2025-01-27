@@ -26,7 +26,7 @@ const Sidebar: React.FC<SidebarProps> = ({ trackedSatList, setTrackedSat, isVisi
 
     setTrackedSat(prevTrackedSat => {
       // If satellite is not present add it to the trackedSatList
-      if (!prevTrackedSat.some(sat => sat.name === satName)) {
+      if (!prevTrackedSat.some(sat => sat.name === selectedSat.name)) {
         return [...prevTrackedSat, selectedSat];
       }
 

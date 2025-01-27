@@ -117,7 +117,7 @@ const Engine: React.FC = ({ trackedSatList, setTrackedSat }) => {
     if(satManagerRef.current) {
       satManagerRef.current.reset_tracked_sat_list();
       trackedSatList?.forEach(satellite => {
-         satManagerRef.current.has(satellite.name) ? 
+         satManagerRef.current.has(satellite) ? 
            satManagerRef.current.update(satellite) 
            : satManagerRef.current.add(satellite);
       }); 

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import * as satellite from 'satellite.js';
+import * as satLIB from 'satellite.js';
 import axios from 'axios';
 import satellite_search_params from '@/interfaces/sat_data_intf.ts';
 
@@ -55,12 +55,12 @@ export default class Satellite implements satellite_search_params {
 
     //environment variable for drawing the orbit 
     this.earthRadius = 5;
-    this.scaleFactor = earthRadius / 6371; // 6371 is the approximate radius of the Earth in km
+    this.scaleFactor = this.earthRadius / 6371; // 6371 is the approximate radius of the Earth in km
     this.altitude = 0.314; // scaled altitude for ISS
 
     // To simply test 
     const iss_test_sat = {name: "ISS", status: "active", norad_cat_id: 25544};
-    ISS_Celestrak_API_url = `https://celestrak.org/NORAD/elements/gp.php?CATNR=${this.iss_test_sat.norad_cat_id}&FORMAT=TLE`;
+    this.ISS_Celestrak_API_url = `https://celestrak.org/NORAD/elements/gp.php?CATNR=${iss_test_sat.norad_cat_id}&FORMAT=TLE`;
 
     this.Celestrak_API_url = `https://celestrak.org/NORAD/elements/gp.php?CATNR=${this.norad_cat_id}&FORMAT=TLE`;
     this.positions = [];
@@ -102,18 +102,21 @@ export default class Satellite implements satellite_search_params {
         to_return = false;
       }
       else {
-        this.TLE_lines = response;
+        this.TLE_lines = response.data;
       }
       
-      const { line1, line2 } = this.TLE_lines;
+      const { line1, line2 } = this._parse_TLE(this.TLE_lines);
      
       console.log('TLE Response:', response.data);
+      console.log('TLE Response:', response.data.line1);
       
       if (!line1 || !line2) {
         throw new Error('Invalid TLE data received');
       }
       
-      this.satrec = satellite.twoline2satrec(line1, line2);
+      this.satrec = satLIB.twoline2satrec(line1, line2);
+      
+      console.log(this.satrec);
       
       if (!this.satrec) {
         throw new Error('Failed to parse TLE data');
@@ -125,6 +128,19 @@ export default class Satellite implements satellite_search_params {
       throw error;
     }
   }
+  
+  private _parse_TLE(data : any) {
+      if(!data.line1 || !data.line2) {
+
+        // Parse `line1` and `line2` if `response.data` is a single string
+        const tleLines = data.split('\n').map((line) => line.trim());
+        const line1 = tleLines[1]; // First TLE line
+        const line2 = tleLines[2]; // Second TLE line
+        return {line1 : line1, line2: line2};
+      } else {
+        return {line1 : data.line1, line2: data.line2};
+      }
+    }
 
   private _generate_positions(number_of_points : number) {
 

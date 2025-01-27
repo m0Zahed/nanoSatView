@@ -16,6 +16,7 @@ export default class SatelliteManager {
   mainScene : THREE.Scene;
 
   constructor(scene : THREE.Scene) {
+    this.tracked_satellites = new Map();
     this.mainScene = scene;
   }
   

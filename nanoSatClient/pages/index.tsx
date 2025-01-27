@@ -11,6 +11,8 @@ const inter = Inter({ subsets: ['latin'] });
 
 export default function Home() {
   const [isSidebarVisible, setSidebarVisible] = useState(false);
+
+  // trackedSatList is the interface between the Sidebar, Engine and Satellite Manager 
   const [trackedSatList, setTrackedSat] = useState<satellite_search_params[]>([]);
 
   const toggleSidebar = () => {

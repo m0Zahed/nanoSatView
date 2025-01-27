@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as satellite from 'satellite.js';
 import axios from 'axios';
+import satellite_search_params from '@/interfaces/sat_data_intf.ts';
 
 // TLE Response Interface for the Celestrak API
 interface TLE_Response_Celestrak {
@@ -8,12 +9,9 @@ interface TLE_Response_Celestrak {
   line2: string;
 }
 
-export default class Satellite {
+export default class Satellite implements satellite_search_params {
   // Stuff in use
   sat_id: string;
-  norad_cat_id: number;
-  name: string;
-  status: string;
 
   // Stuff not in use 
   norad_follow_id: number | null;
@@ -33,6 +31,7 @@ export default class Satellite {
 
   // Other Stuff used here
   Celestrak_API_url : string;
+  ISS_Celestrak_API_url : string; 
 
   static earthRadius : number; 
   static scaleFactor : number;
@@ -53,9 +52,20 @@ export default class Satellite {
     this.norad_cat_id = data.norad_cat_id;
     this.name = data.name;
     this.status = data.status;
+
+    //environment variable for drawing the orbit 
+    this.earthRadius = 5;
+    this.scaleFactor = earthRadius / 6371; // 6371 is the approximate radius of the Earth in km
+    this.altitude = 0.314; // scaled altitude for ISS
+
+    // To simply test 
+    const iss_test_sat = {name: "ISS", status: "active", norad_cat_id: 25544};
+    ISS_Celestrak_API_url = `https://celestrak.org/NORAD/elements/gp.php?CATNR=${this.iss_test_sat.norad_cat_id}&FORMAT=TLE`;
+
     this.Celestrak_API_url = `https://celestrak.org/NORAD/elements/gp.php?CATNR=${this.norad_cat_id}&FORMAT=TLE`;
     this.positions = [];
   }
+
 
   toJSON() {
     return {
@@ -84,10 +94,10 @@ export default class Satellite {
    * @brief Fetches the TLEs and returns true if the TLE's have been updated.
    */
   public async fetch_TLEs(): Promise<boolean> {
-    const to_return = true;
+    var to_return = true;
     try {
 
-      const response = await axios.get<TLE_Response_Celestrak>(this.Celestrak_API_url);
+      const response = await axios.get<TLE_Response_Celestrak>(this.ISS_Celestrak_API_url);
       if(response === this.TLE_lines) {
         to_return = false;
       }
@@ -130,7 +140,7 @@ export default class Satellite {
         const positionGd = satellite.eciToGeodetic(positionEci, gmst);
         const longitude = positionGd.longitude * (180 / Math.PI);
         const latitude = positionGd.latitude * (180 / Math.PI);
-        const height = (positionGd.height * this.scaleFactor) + this.earthRadius + this,altitude; // Scale height
+        const height = (positionGd.height * this.scaleFactor) + this.earthRadius + this.altitude; // Scale height
 
         const x = height * Math.cos(latitude * Math.PI / 180) * Math.cos(longitude * Math.PI / 180);
         const y = height * Math.cos(latitude * Math.PI / 180) * Math.sin(longitude * Math.PI / 180);

@@ -1,14 +1,13 @@
-import Satellite from "./satellite";
+import Satellite_ from "./satellite.ts";
 import * as THREE from 'three';
 import { satellite_search_params }  from '../interfaces/sat_data_intf'
 
-interface Satellite_Details extends Satellite {
+interface Satellite_Details extends Satellite_ {
    checked : boolean; 
 } 
 
 export default class SatelliteManager {
   
-  iss_test_sat : satellite_search_params;
   tracked_satellites : Map<string, Satellite_Details>;
   earthRadius : number;
   scaleFactor : number; 
@@ -17,14 +16,6 @@ export default class SatelliteManager {
   mainScene : THREE.Scene;
 
   constructor(scene : THREE.Scene) {
-    //environment variable for drawing the orbit 
-    earthRadius = 5;
-    scaleFactor = earthRadius / 6371; // 6371 is the approximate radius of the Earth in km
-    altitude = 0.314; // scaled altitude for ISS
-
-    // To simply test 
-    iss_test_sat = {name: "ISS", status: "active", norad_cat_id: 25544};
-    Celestrak_API_url = `https://celestrak.org/NORAD/elements/gp.php?CATNR=${this.iss_test_sat.norad_cat_id}&FORMAT=TLE`;
     this.mainScene = scene;
   }
   
@@ -32,27 +23,35 @@ export default class SatelliteManager {
    * @brief This will be ran before update and add, NECESSARY STEP!
    */
   public reset_tracked_sat_list() {
-    this.tracked_satellites.forEach( (key, value) => {
-      value.checked = false; 
-    });
+      this.tracked_satellites?.forEach( (value, key) => {
+        value.checked = false; 
+      });
   }
 
-  public add(sat_name : string) {
-    try{ 
-      
-      // '!' added to ensure that the satellite is definitely found
-      const selected_sat : Satellite = this.tracked_satellites.get(sat_name)!;
+  public add(satelliteData: satellite_search_params) {
+    try {
+      // Initialize Satellite_Details object using the provided data
+      const selected_sat: Satellite_Details = new Satellite_(satelliteData) as Satellite_Details;
+
+      // Fetch TLE data based on the NORAD ID
       selected_sat.fetch_TLEs();
-      selected_sat.create_3d_models(); 
+      selected_sat.create_3d_models();
       selected_sat.init();
       this.show(selected_sat);
+
+      // Mark the satellite as tracked
       selected_sat.checked = true;
 
-    } catch(error) {
-      console.error('Error in updating the satellite details:', error);
+      // Add to tracked satellites using its NORAD ID as the key
+      this.tracked_satellites.set(selected_sat.norad_cat_id.toString(), selected_sat);
+    } catch (error) {
+      console.error(
+        `Error adding satellite with NORAD ID ${satelliteData.norad_cat_id}:`,
+        error
+      );
     }
   }
-  
+
   /**
    * @brief supposed to re
    */
@@ -66,6 +65,8 @@ export default class SatelliteManager {
         selected_sat.init();
         this.show(selected_sat);
         selected_sat.checked = true;
+        this.tracked_satellites[sat_name] = selected_sat;
+
       } else {
        console.log("The TLE's have no updates.");
       }
@@ -82,7 +83,7 @@ export default class SatelliteManager {
    * @brief Called to remove all unchecked
    */
   public clean() {
-    this.tracked_satellites.forEach((key, value) => {
+    this.tracked_satellites?.forEach((key, value) => {
       if(!value.checked)
       {
         this.tracked_satellites.delete(key);

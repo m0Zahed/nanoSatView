@@ -58,16 +58,17 @@ export default class SatelliteManager {
    */
   public update(sat_name : string) {
     try{ 
-      
+       
       // '!' added to ensure that the satellite is definitely found
       const selected_sat : Satellite = this.tracked_satellites.get(sat_name)!;
       if(selected_sat.fetch_TLEs()) {
+        this.hide(selected_sat.name);
         selected_sat.create_3d_models(); 
         selected_sat.init();
         this.show(selected_sat);
         selected_sat.checked = true;
         this.tracked_satellites[sat_name] = selected_sat;
-
+        this.show(selected_sat.name);
       } else {
        console.log("The TLE's have no updates.");
       }
@@ -76,7 +77,7 @@ export default class SatelliteManager {
     }
   }
 
-  private _remove(sat_nmae  : string) {
+  private _remove(sat_name : string) {
       Satellite = this.tracked_satellites.delete(sat_name)!;
   }
   
@@ -102,16 +103,22 @@ export default class SatelliteManager {
   /**
    * @brief Hides the satellite by removing the object from the scene 
    */
-  public hide(active_sat : Satellite) : void {
-    this.mainScene.remove(active_sat.get_orbit());  
-    this.mainScene.remove(active_sat.get_marker());  
+  public hide(sat_name : string) : void {
+    if(this.has(sat_name)) {
+      const active_sat : Satellite = this.tracked_satellites.get(sat_name)!;
+      this.mainScene.remove(active_sat.get_orbit());  
+      this.mainScene.remove(active_sat.get_marker());  
+    }
   }
 
   /**
    * @brief Stops rednering the satellite and deletes the position generated positions array
    */
-  public show(active_sat : Satellite) : void {
-    this.mainScene.add(active_sat.get_orbit());  
-    this.mainScene.add(active_sat.get_marker());  
+  public show(sat_name : string) : void {
+    if(this.has(sat_name)) {
+      const active_sat : Satellite = this.tracked_satellites.get(sat_name)!;
+      this.mainScene.add(active_sat.get_orbit());  
+      this.mainScene.add(active_sat.get_marker());  
+    }
   }
 }

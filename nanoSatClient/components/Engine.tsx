@@ -4,7 +4,6 @@
  *
  *  The following contains all the logic to render the planet and then 
  *
- *  The Orientation of the axes is as follows. Because the 
  *        White -> x           -> ECI
  *        brown -> y           -> ECEF 
  */
@@ -18,7 +17,7 @@ import * as satellite from 'satellite.js';
 import frameManager from '@/models/frameManager.ts';
 import planet from '@/models/planet.ts';
 import sunLight from '@/models/sunLight';
-import satelliteManager from '@/models/satelliteManager.ts'
+import satelliteManager from '@/models/satelliteManager.tsx'
 
 /**
  * @brief The engine will take care of all the rendering 
@@ -123,7 +122,7 @@ const Engine: React.FC = ({ trackedSatList, setTrackedSat }) => {
       }); 
       satManagerRef.current?.clean();
     }
-    }, [trackedSatList]) 
+  }, [trackedSatList]) 
 
   // -------------------------- MAIN ------------------------------------
 
@@ -147,7 +146,10 @@ const Engine: React.FC = ({ trackedSatList, setTrackedSat }) => {
     };
   }, []);
 
-  return <div ref={mountRef} style={{ width: '100vw', height: '100vh' }} />;
+  return <>
+    <div ref={mountRef} style={{ width: '100vw', height: '100vh' }} />
+    {satManagerRef.current ? satManagerRef.current.ret_sat_list() : <></>}    
+  </>;
 };
 
 export default Engine;

@@ -1,9 +1,11 @@
 import Satellite_ from "./satellite.ts";
 import * as THREE from 'three';
 import { satellite_search_params }  from '../interfaces/sat_data_intf'
+import { Box, Paper, List, ListItem, ListItemText, Button } from '@mui/material';
 
 interface Satellite_Details extends Satellite_ {
-   checked : boolean; 
+   checked : boolean; // deletes the satellite 
+   hidden : boolean; // hides the sat from viewing
 } 
 
 export default class SatelliteManager {
@@ -42,6 +44,7 @@ export default class SatelliteManager {
 
       // Mark the satellite as tracked
       selected_sat.checked = true;
+      selected_sat.hidden = false;
 
       // Add to tracked satellites using its NORAD ID as the key
       this.tracked_satellites.set(selected_sat.norad_cat_id.toString(), selected_sat);
@@ -121,4 +124,84 @@ export default class SatelliteManager {
       this.mainScene.add(active_sat.get_marker());  
     }
   }
+
+  /**
+   * Returns a JSX element that displays the list of satellites.
+   */
+  public ret_sat_list(): JSX.Element {
+    const handleToggleHidden = (satKey: string) => {
+      const sat = this.tracked_satellites.get(satKey);
+      if (!sat) return;
+      if (sat.hidden) {
+        this.show(satKey);
+        sat.hidden = false;
+      } else {
+        this.hide(satKey);
+        sat.hidden = true;
+      }
+      // Note: You might need to trigger a re-render in your React component
+      // to reflect the changes if they are not updating automatically.
+    };
+
+    return (
+      <Box
+        sx={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          width: '100vw',
+          height: '33vh',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          pointerEvents: 'auto',
+          backgroundColor: 'rgba(0, 0, 0, 0.1)',
+        }}
+      >
+        <Paper sx={{ width: '80%', maxHeight: '90%', overflowY: 'auto', padding: 2 }}>
+          <List>
+            {Array.from(this.tracked_satellites.entries()).map(([key, sat]) => (
+              <ListItem key={key} divider>
+                <ListItemText
+                  primary={sat.name || `Satellite ${key}`}
+                  secondary={
+                    <>
+                      <div>
+                        <strong>Velocity:</strong>{' '}
+                        {sat.velocity !== undefined ? sat.velocity.toFixed(2) : 'N/A'}
+                      </div>
+                      <div>
+                        <strong>Latitude:</strong>{' '}
+                        {sat.lat !== undefined ? sat.lat.toFixed(2) : 'N/A'}
+                      </div>
+                      <div>
+                        <strong>Longitude:</strong>{' '}
+                        {sat.longitude !== undefined ? sat.longitude.toFixed(2) : 'N/A'}
+                      </div>
+                      <div>
+                        <strong>Elevation:</strong>{' '}
+                        {sat.elevation !== undefined ? sat.elevation.toFixed(2) : 'N/A'}
+                      </div>
+                      <div>
+                        <strong>Last TLE Time:</strong>{' '}
+                        {sat.lastTLETime ? new Date(sat.lastTLETime).toLocaleString() : 'N/A'}
+                      </div>
+                    </>
+                  }
+                />
+                <Button
+                  variant="contained"
+                  onClick={() => handleToggleHidden(key)}
+                  sx={{ height: 'fit-content' }}
+                >
+                  {sat.hidden ? 'Show' : 'Hide'}
+                </Button>
+              </ListItem>
+            ))}
+          </List>
+        </Paper>
+      </Box>
+    );
+  }
+
 }

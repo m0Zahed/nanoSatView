@@ -30,7 +30,7 @@ const Sidebar: React.FC<SidebarProps> = ({ trackedSatList, setTrackedSat, isVisi
         return [...prevTrackedSat, selectedSat];
       }
 
-      console.log(`Satellite ${satName} is already being tracked.`);
+      console.log(`Satellite ${prevTrackedSat.satName} is already being tracked.`);
       return prevTrackedSat;
 
     });

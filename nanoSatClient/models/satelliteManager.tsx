@@ -31,13 +31,13 @@ export default class SatelliteManager {
       });
   }
 
-  public add(satelliteData: satellite_search_params) {
+  public async add(satelliteData: satellite_search_params) {
     try {
       // Initialize Satellite_Details object using the provided data
-      const selected_sat: Satellite_Details = new Satellite_(satelliteData) as Satellite_Details;
-
+      const selected_sat: Satellite_Details = new Satellite_(satelliteData);
+      
       // Fetch TLE data based on the NORAD ID
-      selected_sat.fetch_TLEs();
+      await selected_sat.fetch_TLEs();
       selected_sat.create_3d_models();
       selected_sat.init();
       this.show(selected_sat);
@@ -48,6 +48,7 @@ export default class SatelliteManager {
 
       // Add to tracked satellites using its NORAD ID as the key
       this.tracked_satellites.set(selected_sat.norad_cat_id.toString(), selected_sat);
+      console.log("Hooray!");
     } catch (error) {
       console.error(
         `Error adding satellite with NORAD ID ${satelliteData.norad_cat_id}:`,
@@ -59,12 +60,12 @@ export default class SatelliteManager {
   /**
    * @brief supposed to re
    */
-  public update(sat_name : string) {
+  public async update(sat_name : string) {
     try{ 
        
       // '!' added to ensure that the satellite is definitely found
       const selected_sat : Satellite = this.tracked_satellites.get(sat_name)!;
-      if(selected_sat.fetch_TLEs()) {
+      if(await selected_sat.fetch_TLEs()) {
         this.hide(selected_sat.name);
         selected_sat.create_3d_models(); 
         selected_sat.init();

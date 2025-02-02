@@ -1,6 +1,0 @@
-{
-  "dependencies": {
-    "react-autosuggest": "^10.1.0",
-    "typesense": "^1.8.2"
-  }
-}

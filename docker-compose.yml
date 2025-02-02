@@ -1,9 +1,9 @@
 services:
   typesense:
     image: typesense/typesense:26.0
-    restart: on-failure
+    restart: "no"
     ports:
       - "8108:8108"
     volumes:
-      - ./typesense-data:/data
+      - ./typesense_server:/data
     command: '--data-dir /data --api-key=xyz --enable-cors'

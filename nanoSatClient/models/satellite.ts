@@ -31,6 +31,7 @@ export default class Satellite implements satellite_search_params {
 
   // Other Stuff used here
   Celestrak_API_url : string;
+  ivan_API_url : string;
   ISS_Celestrak_API_url : string; 
 
   static earthRadius : number; 
@@ -61,8 +62,10 @@ export default class Satellite implements satellite_search_params {
     // To simply test 
     const iss_test_sat = {name: "ISS", status: "active", norad_cat_id: 25544};
     this.ISS_Celestrak_API_url = `https://celestrak.org/NORAD/elements/gp.php?CATNR=${iss_test_sat.norad_cat_id}&FORMAT=TLE`;
+    this.ISS_ivan_API_url = `https://tle.ivanstanojevic.me/api/tle/${iss_test_sat.norad_cat_id}`;
 
     this.Celestrak_API_url = `https://celestrak.org/NORAD/elements/gp.php?CATNR=${this.norad_cat_id}&FORMAT=TLE`;
+    this.ivan_API_url = `https://tle.ivanstanojevic.me/api/tle/${this.norad_cat_id}`;
     this.positions = [];
   }
 
@@ -97,7 +100,7 @@ export default class Satellite implements satellite_search_params {
     var to_return = true;
     try {
 
-      const response = await axios.get<TLE_Response_Celestrak>(this.ISS_Celestrak_API_url);
+      const response = await axios.get<TLE_Response_Celestrak>(this.ivan_API_url);
       if(response === this.TLE_lines) {
         to_return = false;
       }
@@ -108,7 +111,7 @@ export default class Satellite implements satellite_search_params {
       const { line1, line2 } = this._parse_TLE(this.TLE_lines);
      
       console.log('TLE Response:', response.data);
-      console.log('TLE Response:', response.data.line1);
+      //console.log('TLE Response:', response.data.line1);
       
       if (!line1 || !line2) {
         throw new Error('Invalid TLE data received');
@@ -116,7 +119,7 @@ export default class Satellite implements satellite_search_params {
       
       this.satrec = satLIB.twoline2satrec(line1, line2);
       
-      console.log(this.satrec);
+      console.log(`Sat Rec for ${this.name}: `, this.satrec);
       
       if (!this.satrec) {
         throw new Error('Failed to parse TLE data');
@@ -144,16 +147,17 @@ export default class Satellite implements satellite_search_params {
 
   private _generate_positions(number_of_points : number) {
 
+    console.log(`Satrec in generate positions,`, this.satrec);
     this.positions = [];
     const currentDate = new Date();
     for (let i = 0; i < number_of_points; i++) {
       const time = new Date(currentDate.getTime() + i * 60000);
-      const positionAndVelocity = satellite.propagate(this.satrec, time);
+      const positionAndVelocity = satLIB.propagate(this.satrec, time);
       const positionEci = positionAndVelocity.position;
 
       if (positionEci) {
-        const gmst = satellite.gstime(time);
-        const positionGd = satellite.eciToGeodetic(positionEci, gmst);
+        const gmst = satLIB.gstime(time);
+        const positionGd = satLIB.eciToGeodetic(positionEci, gmst);
         const longitude = positionGd.longitude * (180 / Math.PI);
         const latitude = positionGd.latitude * (180 / Math.PI);
         const height = (positionGd.height * this.scaleFactor) + this.earthRadius + this.altitude; // Scale height
@@ -165,10 +169,14 @@ export default class Satellite implements satellite_search_params {
         this.positions.push(new THREE.Vector3(x, y, z));
       }
     }
+
+   console.log(`Generated Positions for ${this.name}!`);
+    
   } 
   
   private _generate_line_object() : void {
     try {
+      console.log("Generating line, object!");
       if (!this.positions || this.positions.length === 0) {
         console.warn("Positions array is empty or undefined. No line generated.");
         return null;  // Return null instead of throwing an error
@@ -179,6 +187,8 @@ export default class Satellite implements satellite_search_params {
       this.orbitLine = new THREE.Line(orbitGeometry, orbitMaterial);
       this.orbitLine.rotation.x = -Math.PI / 2;
 
+      console.log(`Generated line object for ${this.name}`);
+      
     } catch (error) {
       console.error("Error generating line object:", error);
     }
@@ -193,6 +203,7 @@ export default class Satellite implements satellite_search_params {
       const MarkerGeometry = new THREE.SphereGeometry(0.1, 32, 32);
       const MarkerMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
       this.MarkerMesh = new THREE.Mesh(MarkerGeometry, MarkerMaterial);
+      console.log(`Generated marker object for ${this.name}`);
     } catch (error) {
       console.error("Error generating line object:", error);
     }
@@ -204,6 +215,7 @@ export default class Satellite implements satellite_search_params {
   * @see You can modify the number of positions you'd like to 
   */
   public create_3d_models() : void {
+    
     // Generates a specified number of points 
     this._generate_positions(1400); 
 
@@ -219,21 +231,22 @@ export default class Satellite implements satellite_search_params {
    */
   public init() {
       const time = new Date();
-      const positionAndVelocity = satellite.propagate(satrec, time);
+      const positionAndVelocity = satLIB.propagate(this.satrec, time);
       const positionEci = positionAndVelocity.position;
 
       if (positionEci) {
-        const gmst = satellite.gstime(time);
-        const positionGd = satellite.eciToGeodetic(positionEci, gmst);
+        const gmst = satLIB.gstime(time);
+        const positionGd = satLIB.eciToGeodetic(positionEci, gmst);
         const longitude = positionGd.longitude * (180 / Math.PI);
         const latitude = positionGd.latitude * (180 / Math.PI);
-        const height = (positionGd.height * scaleFactor) + earthRadius + altitude; // Scale height
+        const height = (positionGd.height * this.scaleFactor) + this.earthRadius + this.altitude; // Scale height
 
         const x = height * Math.cos(latitude * Math.PI / 180) * Math.cos(longitude * Math.PI / 180);
         const y = height * Math.cos(latitude * Math.PI / 180) * Math.sin(longitude * Math.PI / 180);
         const z = height * Math.sin(latitude * Math.PI / 180);
         
         const vector = new THREE.Vector3(x,y,z);
+        // To sync with the current frame
         vector.applyAxisAngle(new THREE.Vector3(1,0,0), - Math.PI / 2);
         this.MarkerMesh.position.set(vector.x, vector.y, vector.z);
       }

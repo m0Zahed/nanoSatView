@@ -18,6 +18,7 @@ import frameManager from '@/models/frameManager.ts';
 import planet from '@/models/planet.ts';
 import sunLight from '@/models/sunLight';
 import satelliteManager from '@/models/satelliteManager.tsx'
+import SatelliteList from './SatelliteList.tsx';
 
 /**
  * @brief The engine will take care of all the rendering 
@@ -50,7 +51,6 @@ const Engine: React.FC = ({ trackedSatList, setTrackedSat }) => {
   const satManagerRef = useRef<satelliteManager | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const initialisedScene = useRef<boolean>(false);
-
 
   // -------------------------- FUNCTIONS ------------------------------------
   
@@ -120,9 +120,7 @@ const Engine: React.FC = ({ trackedSatList, setTrackedSat }) => {
            satManagerRef.current.update(satellite) 
            : satManagerRef.current.add(satellite);
       }); 
-      satManagerRef.current?.clean();
-      
-      
+      satManagerRef.current.clean();
     }
   }, [trackedSatList]) 
 
@@ -150,7 +148,7 @@ const Engine: React.FC = ({ trackedSatList, setTrackedSat }) => {
 
   return <>
     <div ref={mountRef} style={{ width: '100vw', height: '100vh' }} />
-    {satManagerRef.current ? satManagerRef.current.ret_sat_list() : <></>}    
+    {satManagerRef.current ? <SatelliteList satelliteManager={satManagerRef.current} />:  <></>}    
   </>;
 };
 

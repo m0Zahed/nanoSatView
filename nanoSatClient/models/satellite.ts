@@ -69,7 +69,6 @@ export default class Satellite implements satellite_search_params {
     this.positions = [];
   }
 
-
   toJSON() {
     return {
       sat_id: this.sat_id,

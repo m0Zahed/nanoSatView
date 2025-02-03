@@ -43,6 +43,8 @@ const Sidebar: React.FC<SidebarProps> = ({ trackedSatList, setTrackedSat, isVisi
 
       if (existingSat) {
         // Remove the satellite if it already exists
+        console.log(`Removed sat ${satName} from the Sidebar.`);
+        
         return prevTrackedSat.filter(sat => sat.name !== satName);
       }
 

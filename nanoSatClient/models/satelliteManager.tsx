@@ -1,7 +1,6 @@
 import Satellite_ from "./satellite.ts";
 import * as THREE from 'three';
-import { satellite_search_params }  from '../interfaces/sat_data_intf'
-import { Box, Paper, List, ListItem, ListItemText, Button } from '@mui/material';
+import { satellite_search_params }  from '../interfaces/sat_data_intf';
 
 interface Satellite_Details extends Satellite_ {
    checked : boolean; // deletes the satellite 
@@ -18,10 +17,20 @@ export default class SatelliteManager {
   mainScene : THREE.Scene;
 
   constructor(scene : THREE.Scene) {
-    this.tracked_satellites = new Map();
+    this.tracked_satellites = new Map<string, Satellite_Details>();
     this.mainScene = scene;
   }
   
+  /**
+   * @brief Triggers updates of the satellite list.
+   *
+   * The updaters functions do the following tasks:
+   * 1. For each satellite it calls the a updater function which is defined in the
+   * satelliteList component.
+   */
+  private _triggerUpdate() {
+  }
+
   /**
    * @brief This will be ran before update and add, NECESSARY STEP!
    */
@@ -40,14 +49,12 @@ export default class SatelliteManager {
       await selected_sat.fetch_TLEs();
       selected_sat.create_3d_models();
       selected_sat.init();
-      this.show(selected_sat);
 
       // Mark the satellite as tracked
       selected_sat.checked = true;
-      selected_sat.hidden = false;
 
       // Add to tracked satellites using its NORAD ID as the key
-      this.tracked_satellites.set(selected_sat.norad_cat_id.toString(), selected_sat);
+      this.tracked_satellites.set(selected_sat.name, selected_sat);
       console.log("Hooray!");
     } catch (error) {
       console.error(
@@ -64,15 +71,13 @@ export default class SatelliteManager {
     try{ 
        
       // '!' added to ensure that the satellite is definitely found
-      const selected_sat : Satellite = this.tracked_satellites.get(sat_name)!;
+      const selected_sat : Satellite_ = this.tracked_satellites.get(sat_name)!;
       if(await selected_sat.fetch_TLEs()) {
-        this.hide(selected_sat.name);
         selected_sat.create_3d_models(); 
         selected_sat.init();
         this.show(selected_sat);
         selected_sat.checked = true;
         this.tracked_satellites[sat_name] = selected_sat;
-        this.show(selected_sat.name);
       } else {
        console.log("The TLE's have no updates.");
       }
@@ -82,20 +87,23 @@ export default class SatelliteManager {
   }
 
   private _remove(sat_name : string) {
-      Satellite = this.tracked_satellites.delete(sat_name)!;
+      this.hide(sat_name);
+      this.tracked_satellites.delete(sat_name)!;
+      console.log(`Removed ${sat_name} permanently!`);
   }
   
   /**
    * @brief Called to remove all unchecked
    */
   public clean() {
-    this.tracked_satellites?.forEach((key, value) => {
-      if(!value.checked)
-      {
-        this.tracked_satellites.delete(key);
-      }
-    });
+    setTimeout(() => {
+      this.tracked_satellites?.forEach((sat, sat_Name) => {
+        !sat.checked ? this._remove(sat.name) : this.show(sat.name);
+      });
+      console.log("Cleaned!");
+    }, 5000); // 5 seconds in milliseconds
   }
+  
 
   /**
    * @brief Checks if a sat is being tracked for not 
@@ -109,9 +117,10 @@ export default class SatelliteManager {
    */
   public hide(sat_name : string) : void {
     if(this.has(sat_name)) {
-      const active_sat : Satellite = this.tracked_satellites.get(sat_name)!;
+      const active_sat : Satellite_ = this.tracked_satellites.get(sat_name)!;
       this.mainScene.remove(active_sat.get_orbit());  
       this.mainScene.remove(active_sat.get_marker());  
+      active_sat.hidden = true;
     }
   }
 
@@ -120,89 +129,11 @@ export default class SatelliteManager {
    */
   public show(sat_name : string) : void {
     if(this.has(sat_name)) {
-      const active_sat : Satellite = this.tracked_satellites.get(sat_name)!;
+      const active_sat : Satellite_ = this.tracked_satellites.get(sat_name)!;
       this.mainScene.add(active_sat.get_orbit());  
       this.mainScene.add(active_sat.get_marker());  
+      active_sat.hidden = false;
     }
-  }
-
-  /**
-   * Returns a JSX element that displays the list of satellites.
-   */
-  public ret_sat_list(): JSX.Element {
-    const handleToggleHidden = (satKey: string) => {
-      const sat = this.tracked_satellites.get(satKey);
-      if (!sat) return;
-      if (sat.hidden) {
-        this.show(satKey);
-        sat.hidden = false;
-      } else {
-        this.hide(satKey);
-        sat.hidden = true;
-      }
-      // Note: You might need to trigger a re-render in your React component
-      // to reflect the changes if they are not updating automatically.
-    };
-
-    return (
-      <Box
-        sx={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          width: '100vw',
-          height: '33vh',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          pointerEvents: 'auto',
-          backgroundColor: 'rgba(0, 0, 0, 0.1)',
-        }}
-      >
-        <Paper sx={{ width: '80%', maxHeight: '90%', overflowY: 'auto', padding: 2 }}>
-          <List>
-            {Array.from(this.tracked_satellites.entries()).map(([key, sat]) => (
-              <ListItem key={key} divider>
-                <ListItemText
-                  primary={sat.name || `Satellite ${key}`}
-                  secondary={
-                    <>
-                      <div>
-                        <strong>Velocity:</strong>{' '}
-                        {sat.velocity !== undefined ? sat.velocity.toFixed(2) : 'N/A'}
-                      </div>
-                      <div>
-                        <strong>Latitude:</strong>{' '}
-                        {sat.lat !== undefined ? sat.lat.toFixed(2) : 'N/A'}
-                      </div>
-                      <div>
-                        <strong>Longitude:</strong>{' '}
-                        {sat.longitude !== undefined ? sat.longitude.toFixed(2) : 'N/A'}
-                      </div>
-                      <div>
-                        <strong>Elevation:</strong>{' '}
-                        {sat.elevation !== undefined ? sat.elevation.toFixed(2) : 'N/A'}
-                      </div>
-                      <div>
-                        <strong>Last TLE Time:</strong>{' '}
-                        {sat.lastTLETime ? new Date(sat.lastTLETime).toLocaleString() : 'N/A'}
-                      </div>
-                    </>
-                  }
-                />
-                <Button
-                  variant="contained"
-                  onClick={() => handleToggleHidden(key)}
-                  sx={{ height: 'fit-content' }}
-                >
-                  {sat.hidden ? 'Show' : 'Hide'}
-                </Button>
-              </ListItem>
-            ))}
-          </List>
-        </Paper>
-      </Box>
-    );
   }
 
 }

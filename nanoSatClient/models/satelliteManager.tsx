@@ -15,12 +15,14 @@ export default class SatelliteManager {
   altitude : number;
   Celestrak_API_url : string;
   mainScene : THREE.Scene;
+  setTrigger?: React.Dispatch<React.SetStateAction<boolean>>;
+
 
   constructor(scene : THREE.Scene) {
     this.tracked_satellites = new Map<string, Satellite_Details>();
     this.mainScene = scene;
   }
-  
+
   /**
    * @brief Triggers updates of the satellite list.
    *
@@ -28,7 +30,15 @@ export default class SatelliteManager {
    * 1. For each satellite it calls the a updater function which is defined in the
    * satelliteList component.
    */
-  private _triggerUpdate() {
+  public triggerUpdate() {
+    this.setTrigger?.( val => !val); 
+  }
+
+  /**
+   * @brief Updater set in SatelliteList, triggers reacts whenever value is changed
+   */
+  public setUpdater(setState: React.Dispatch<React.SetStateAction<Map<string, Satellite_Details>>>) {
+    this.setTrigger = setState;
   }
 
   /**
@@ -100,6 +110,7 @@ export default class SatelliteManager {
       this.tracked_satellites?.forEach((sat, sat_Name) => {
         !sat.checked ? this._remove(sat.name) : this.show(sat.name);
       });
+      this.triggerUpdate();
       console.log("Cleaned!");
     }, 5000); // 5 seconds in milliseconds
   }

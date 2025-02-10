@@ -8,31 +8,32 @@ interface SatelliteItemProps {
 
 const SatelliteItem: React.FC<SatelliteItemProps> = ({ satellite, onToggleHidden }) => {
   const [hide_show, set_hide_show] = useState<string>("Hide");
+   
   return (
     <ListItem key={satellite.name} divider>
       <ListItemText
         primary={satellite.name || `Satellite ${satellite.name}`}
         secondary={
           <>
-            <div>
+            <div style={{ color: 'white' }}>
               <strong>Velocity:</strong>{" "}
               {satellite.velocity !== undefined ? satellite.velocity.toFixed(2) : "N/A"}
-            </div>
-            <div>
+              {" "} 
               <strong>Latitude:</strong>{" "}
               {satellite.lat !== undefined ? satellite.lat.toFixed(2) : "N/A"}
-            </div>
-            <div>
+
+              {" "} 
               <strong>Longitude:</strong>{" "}
               {satellite.longitude !== undefined ? satellite.longitude.toFixed(2) : "N/A"}
-            </div>
-            <div>
+              {" "} 
+
               <strong>Elevation:</strong>{" "}
               {satellite.elevation !== undefined ? satellite.elevation.toFixed(2) : "N/A"}
-            </div>
-            <div>
+              {" "} 
+
               <strong>Last TLE Time:</strong>{" "}
               {satellite.lastTLETime ? new Date(satellite.lastTLETime).toLocaleString() : "N/A"}
+              {" "} 
             </div>
           </>
         }
@@ -44,7 +45,13 @@ const SatelliteItem: React.FC<SatelliteItemProps> = ({ satellite, onToggleHidden
           hide_show === "Hide" ?
             set_hide_show("Show") : set_hide_show("Hide"); 
         }}
-        sx={{ height: "fit-content" }}
+        sx={{
+              height: "fit-content",
+              backgroundColor: 'transparent', // Transparent background
+              color: 'lightgreen', // Green text
+              borderColor: 'green', // Optional: if you want a green border
+              borderWidth: 1, // Optional: if you want a border around the button
+            }}
       >
         {hide_show}
       </Button>

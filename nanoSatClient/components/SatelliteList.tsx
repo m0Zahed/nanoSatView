@@ -46,13 +46,26 @@ const SatelliteList: React.FC<SatelliteListProps> = ({ satelliteManager }) => {
         justifyContent: 'center',
         alignItems: 'center',
         pointerEvents: 'auto',
-        backgroundColor: 'rgba(0, 0, 0, 0.1)',
+        backgroundColor: 'transparent', // Set the background to be fully transparent
       }}
     >
-      <Paper sx={{ width: '80%', maxHeight: '90%', overflowY: 'auto', padding: 2 }}>
+      <Paper
+        sx={{
+          width: '80%',
+          maxHeight: '90%',
+          overflowY: 'auto',
+          padding: 2,
+          color: 'white', // Ensure the text inside is white
+          backgroundColor: 'transparent', // Set Paper background to be transparent
+          boxShadow: 'none', // Optional: remove shadow if you want it fully transparent
+        }}
+      >
         <List>
           {Array.from(satelliteManager.tracked_satellites.entries()).map(([key, sat]) => (
-            <SatelliteItem satellite={sat} onToggleHidden={handleToggleHidden}  />
+            <SatelliteItem 
+              satellite={sat} 
+              onToggleHidden={handleToggleHidden} 
+            />
           ))}
         </List>
       </Paper>

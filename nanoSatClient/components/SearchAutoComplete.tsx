@@ -80,7 +80,8 @@ function SearchAutocomplete({ addSatellite }) {
     }
   };
 
-  const onSuggestionsFetchRequested = async ({ value }) => {
+  const onSuggestionsFetchRequested 
+  async ({ value }) => {
     setSuggestions(await getSuggestions(value));
   };
 

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import * as satLIB from 'satellite.js';
 import axios from 'axios';
 import satellite_search_params from '@/interfaces/sat_data_intf.ts';
+import { satellite_position_params } from '../interfaces/sat_data_intf'
 
 // TLE Response Interface for the Celestrak API
 interface TLE_Response_Celestrak {
@@ -67,6 +68,29 @@ export default class Satellite implements satellite_search_params {
     this.Celestrak_API_url = `https://celestrak.org/NORAD/elements/gp.php?CATNR=${this.norad_cat_id}&FORMAT=TLE`;
     this.ivan_API_url = `https://tle.ivanstanojevic.me/api/tle/${this.norad_cat_id}`;
     this.positions = [];
+  }
+
+  updated_parameters() : satellite_position_params {
+
+    const currentDate = new Date();
+    const time = new Date(currentDate.getTime());
+    const positionAndVelocity = satLIB.propagate(this.satrec, time);
+    const positionEci = positionAndVelocity.position;
+
+    const gmst = satLIB.gstime(time);
+    const positionGd = satLIB.eciToGeodetic(positionEci, gmst);
+    const longitude = positionGd.longitude * (180 / Math.PI);
+    const latitude = positionGd.latitude * (180 / Math.PI);
+    const height = (positionGd.height * this.scaleFactor) + this.earthRadius + this.altitude; // Scale height
+
+    return {
+      velocity: positionAndVelocity.velocity,
+      latitude: latitude,
+      longitude: longitude,
+      elevation: positionGd.height, // or positionGd.height, depending on your intended value
+      last_update_time: time,
+    };
+
   }
 
   toJSON() {

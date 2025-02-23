@@ -14,3 +14,16 @@ export interface satellite_search_params {
   norad_cat_id: number;
 }
 
+
+/***
+ * Interface between satellite object and the 
+ */
+export interface satellite_position_params {
+  velocity: number;
+  latitude: number;
+  longitude: number;
+  elevation: number;
+  last_update_time: number;
+}
+
+

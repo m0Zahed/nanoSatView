@@ -1,5 +1,6 @@
 import { ListItem, ListItemText, Button } from "@mui/material";
 import React, { useState, useEffect } from 'react';
+import { satellite_position_params } from '../interfaces/sat_data_intf'
 
 interface SatelliteItemProps {
   satellite: Satellite_Details;
@@ -8,7 +9,17 @@ interface SatelliteItemProps {
 
 const SatelliteItem: React.FC<SatelliteItemProps> = ({ satellite, onToggleHidden }) => {
   const [hide_show, set_hide_show] = useState<string>("Hide");
-   
+  const [positions, set_positions] = useState<satellite_position_params>(satellite.updated_parameters());
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      set_positions(satellite.updated_parameters());
+    }, 1000);
+
+    // Cleanup the interval on component unmount
+    return () => clearInterval(intervalId);
+  }, []);
+  
   return (
     <ListItem key={satellite.name} divider>
       <ListItemText
@@ -17,27 +28,25 @@ const SatelliteItem: React.FC<SatelliteItemProps> = ({ satellite, onToggleHidden
           <>
             <div style={{ color: 'white' }}>
               <strong>Velocity:</strong>{" "}
-              {satellite.velocity !== undefined ? satellite.velocity.toFixed(2) : "N/A"}
+              {positions.velocity !== undefined ? JSON.stringify(positions.velocity) : "N/A"}
               {" "} 
               <strong>Latitude:</strong>{" "}
-              {satellite.lat !== undefined ? satellite.lat.toFixed(2) : "N/A"}
+              {positions.latitude !== undefined ? positions.latitude : "N/A"}
 
               {" "} 
               <strong>Longitude:</strong>{" "}
-              {satellite.longitude !== undefined ? satellite.longitude.toFixed(2) : "N/A"}
+              {positions.longitude !== undefined ? positions.longitude : "N/A"}
               {" "} 
 
               <strong>Elevation:</strong>{" "}
-              {satellite.elevation !== undefined ? satellite.elevation.toFixed(2) : "N/A"}
+              {positions.elevation !== undefined ? positions.elevation : "N/A"}
               {" "} 
 
-              <strong>Last TLE Time:</strong>{" "}
-              {satellite.lastTLETime ? new Date(satellite.lastTLETime).toLocaleString() : "N/A"}
-              {" "} 
             </div>
           </>
         }
       />
+
       <Button
         variant="contained"
         onClick={() => { 
@@ -59,4 +68,7 @@ const SatelliteItem: React.FC<SatelliteItemProps> = ({ satellite, onToggleHidden
   );
 };
 
+              //<strong>Last TLE Time:</strong>{" "}
+              //{positions.lastTLETime !== undefined ? new Date(positions.last_update_time) : "N/A"}
+              //{" "} 
 export default SatelliteItem;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import SatelliteManager, { Satellite_Details } from './SatelliteManager';
+import SatelliteManager, { Satellite_Details } from '../models/satelliteManager.tsx';
 import { Box, Paper, List, ListItem, ListItemText, Button } from '@mui/material';
 
 import * as satLIB from 'satellite.js';

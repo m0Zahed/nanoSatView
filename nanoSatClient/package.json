@@ -34,7 +34,9 @@
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^18",
+    "@types/react-autosuggest": "^10.1.11",
     "@types/react-dom": "^18",
+    "@types/three": "^0.173.0",
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",

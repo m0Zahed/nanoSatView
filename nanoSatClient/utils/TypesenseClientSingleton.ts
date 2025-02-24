@@ -1,20 +1,20 @@
-import Typesense from 'typesense';
+import Typesense, {Client} from 'typesense';
 
 // TODO Add a configuration to set the IP address
 class TypesenseClientSingleton {
-  private static instance: Typesense.Client | null = null;
+  private static instance: Client | null = null;
 
   private constructor() {}
 
-  public static getInstance(): Typesense.Client {
+  public static getInstance(): Client {
     if (this.instance === null) {
       this.instance = this._getClientLocal();
     }
     return this.instance;
   }
 
-  private static _getClientLocal(): Typesense.Client {
-    return new Typesense.Client({
+  private static _getClientLocal(): Client {
+    return new Client({
       nodes: [
         {
           host: 'localhost',

@@ -13,6 +13,8 @@ import { satellite_search_params } from '../interfaces/sat_data_intf'
  *    This has no close button and instead the user will have to click in the area outside the right bar.    
  */
 interface SidebarProps {
+  trackedSatList: satellite_search_params[] ;
+  setTrackedSat: any;
   isVisible: boolean;
   toggle: () => void;
 }
@@ -24,20 +26,20 @@ const Sidebar: React.FC<SidebarProps> = ({ trackedSatList, setTrackedSat, isVisi
    */
   const addTrackedSatellites = (selectedSat : satellite_search_params) => {
 
-    setTrackedSat(prevTrackedSat => {
+    setTrackedSat((prevTrackedSat : satellite_search_params[]) => {
       // If satellite is not present add it to the trackedSatList
-      if (!prevTrackedSat.some(sat => sat.name === selectedSat.name)) {
+      if (!prevTrackedSat.some(( sat : satellite_search_params) => sat.name === selectedSat.name)) {
         return [...prevTrackedSat, selectedSat];
       }
 
-      console.log(`Satellite ${prevTrackedSat.satName} is already being tracked.`);
+      console.log(`Satellite ${selectedSat.name} is already being tracked.`);
       return prevTrackedSat;
 
     });
   };
 
   const removeTrackedSatellite = (satName: string) => {
-    setTrackedSat(prevTrackedSat => {
+    setTrackedSat( (prevTrackedSat : satellite_search_params[])  => {
 
       const existingSat = prevTrackedSat.some(sat => sat.name === satName);
 

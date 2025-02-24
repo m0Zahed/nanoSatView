@@ -19,6 +19,7 @@ import planet from '@/models/planet.ts';
 import sunLight from '@/models/sunLight';
 import satelliteManager from '@/models/satelliteManager.tsx'
 import SatelliteList from './SatelliteList.tsx';
+import { satellite_search_params } from '@/interfaces/sat_data_intf';
 
 /**
  * @brief The engine will take care of all the rendering 
@@ -29,7 +30,13 @@ import SatelliteList from './SatelliteList.tsx';
  *        - Satellites
  *
  */
-const Engine: React.FC = ({ trackedSatList, setTrackedSat }) => {
+
+interface EngineProps {
+  trackedSatList: satellite_search_params[]; 
+  setTrackedSat: (sat: any) => void; 
+}
+
+const Engine: React.FC<EngineProps> = ({ trackedSatList , setTrackedSat }) => {
 
   // Wait for the DOM and Browser window to get initialised.
   // Why? wierd bug happens with initialisation where the renderer is mounted twice,
@@ -49,7 +56,7 @@ const Engine: React.FC = ({ trackedSatList, setTrackedSat }) => {
   const sunLightRef = useRef<sunLight | null>(null);
   const managerRef = useRef<frameManager | null>(null);  
   const satManagerRef = useRef<satelliteManager | null>(null);
-  const controlsRef = useRef<OrbitControls | null>(null);
+  const controlsRef = useRef<any | null>(null);
   const initialisedScene = useRef<boolean>(false);
 
   // -------------------------- FUNCTIONS ------------------------------------
@@ -71,7 +78,7 @@ const Engine: React.FC = ({ trackedSatList, setTrackedSat }) => {
   const animate = () => {
     requestAnimationFrame(animate);
 
-    managerRef.current.rotateFrame('ECEF', 0.0001, 'z');
+    managerRef.current?.rotateFrame('ECEF', 0.0001, 'z');
 
     // Rotations
     rendererRef.current.render(sceneRef.current, cameraRef.current);
@@ -116,9 +123,9 @@ const Engine: React.FC = ({ trackedSatList, setTrackedSat }) => {
     if(satManagerRef.current) {
       satManagerRef.current.reset_tracked_sat_list();
       trackedSatList?.forEach(satellite => {
-         satManagerRef.current.has(satellite) ? 
-           satManagerRef.current.update(satellite) 
-           : satManagerRef.current.add(satellite);
+         satManagerRef.current?.has(satellite.name) ? 
+           satManagerRef.current?.update(satellite.name) 
+           : satManagerRef.current?.add(satellite);
       }); 
       satManagerRef.current.clean();
     }

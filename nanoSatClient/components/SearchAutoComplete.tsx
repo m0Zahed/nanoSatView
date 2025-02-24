@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
+import Typesense, {Client} from 'typesense';
 import Autosuggest from 'react-autosuggest';
-import TextField from '@mui/material/TextField';
+import TextField, { FilledTextFieldProps, OutlinedTextFieldProps, StandardTextFieldProps, TextFieldVariants } from '@mui/material/TextField';
 import Paper from '@mui/material/Paper';
 import MenuItem from '@mui/material/MenuItem';
-import { styled } from '@mui/material/styles';
+import { styled, Theme } from '@mui/material/styles';
 import TypesenseClientSingleton from '@/utils/TypesenseClientSingleton';
 import { satellite_search_params }  from '../interfaces/sat_data_intf'
+import { MUIStyledCommonProps } from '@mui/system';
 
 const Container = styled('div')({
   position: 'relative',
@@ -52,11 +54,15 @@ const StyledTextField = styled(TextField)({
   },
 });
 
-function SearchAutocomplete({ addSatellite }) {
+interface SearchAutocompleteProps {
+  addSatellite: (satellite: satellite_search_params) => void; // Replace `any` with the actual satellite type if available
+}
+
+function SearchAutocomplete({ addSatellite } : SearchAutocompleteProps) {
   const [value, setValue] = useState('');
-  const [suggestions, setSuggestions] = useState([]);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
-  const clientRef = useRef<TypesenseClientSingleton>(TypesenseClientSingleton.getInstance());
+  const clientRef = useRef<Client>(TypesenseClientSingleton.getInstance());
   const client = clientRef.current;
 
   useEffect(() => {
@@ -66,36 +72,37 @@ function SearchAutocomplete({ addSatellite }) {
   }, []);
 
   // queries by the satellite name 
-  const getSuggestions = async value => {
+  const getSuggestions = async (value: any) => {
     try {
       const searchParameters = {
         q: value,
         query_by: 'name,status'
       };
       const result = await client.collections('sats').documents().search(searchParameters);
-      return result.hits.map(hit => hit.document);
+      return result.hits?.map(hit => hit.document);
     } catch (error) {
       console.error("Error fetching suggestions from Typesense:", error);
       return [];
     }
   };
 
-  const onSuggestionsFetchRequested 
-  async ({ value }) => {
-    setSuggestions(await getSuggestions(value));
+  const onSuggestionsFetchRequested =
+  async ({ value } : any) => {
+    const result = await getSuggestions(value) || [];
+    setSuggestions(result);
   };
 
   const onSuggestionsClearRequested = () => {
     setSuggestions([]);
   };
 
-  const getSuggestionValue = suggestion => suggestion.name;
+  const getSuggestionValue = (suggestion: { name: any; }) => suggestion.name;
 
-  const renderInputComponent = inputProps => (
+  const renderInputComponent = (inputProps : any) => (
     <StyledTextField {...inputProps} inputRef={inputRef} fullWidth variant="outlined" />
   );
 
-  const renderSuggestion = (suggestion, { isHighlighted }) => (
+  const renderSuggestion = (suggestion : any, { isHighlighted } : any) => (
     <MenuItem
       selected={isHighlighted}
       component="div"
@@ -108,7 +115,7 @@ function SearchAutocomplete({ addSatellite }) {
     </MenuItem>
   );
 
-  const renderSuggestionsContainer = options => (
+  const renderSuggestionsContainer = (options : any) => (
     <StyledSuggestionsContainer {...options.containerProps} square>
       {options.children}
     </StyledSuggestionsContainer>
@@ -117,11 +124,11 @@ function SearchAutocomplete({ addSatellite }) {
   const inputProps = {
     placeholder: "Satellite Name",
     value,
-    onChange: (_, { newValue }) => setValue(newValue),
+    onChange: (_ : any, { newValue } : any) => setValue(newValue),
     label: "Search Satellite", // Ensure label is always visible
   };
 
-  const onSuggestionSelected = (event, { suggestion, suggestionValue, suggestionIndex, sectionIndex, method }) => {
+  const onSuggestionSelected = (event : any, { suggestion, suggestionValue, suggestionIndex, sectionIndex, method } : any) => {
 
     const sat : satellite_search_params = { 
       name: suggestion.name, 

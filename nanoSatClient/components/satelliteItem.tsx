@@ -1,6 +1,7 @@
 import { ListItem, ListItemText, Button } from "@mui/material";
 import React, { useState, useEffect } from 'react';
 import { satellite_position_params } from '../interfaces/sat_data_intf'
+import { Satellite_Details } from "@/models/satelliteManager";
 
 interface SatelliteItemProps {
   satellite: Satellite_Details;
@@ -21,9 +22,9 @@ const SatelliteItem: React.FC<SatelliteItemProps> = ({ satellite, onToggleHidden
   }, []);
   
   return (
-    <ListItem key={satellite.name} divider>
+    <ListItem key={satellite.names} divider>
       <ListItemText
-        primary={satellite.name || `Satellite ${satellite.name}`}
+        primary={satellite.names || `Satellite ${satellite.names}`}
         secondary={
           <>
             <div style={{ color: 'white' }}>
@@ -50,7 +51,7 @@ const SatelliteItem: React.FC<SatelliteItemProps> = ({ satellite, onToggleHidden
       <Button
         variant="contained"
         onClick={() => { 
-          onToggleHidden(satellite.name)
+          onToggleHidden(satellite.names!)
           hide_show === "Hide" ?
             set_hide_show("Show") : set_hide_show("Hide"); 
         }}

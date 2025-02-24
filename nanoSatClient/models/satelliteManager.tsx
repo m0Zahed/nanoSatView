@@ -2,7 +2,7 @@ import Satellite_ from "./satellite.ts";
 import * as THREE from 'three';
 import { satellite_search_params }  from '../interfaces/sat_data_intf';
 
-interface Satellite_Details extends Satellite_ {
+export interface Satellite_Details extends Satellite_ {
    checked : boolean; // deletes the satellite 
    hidden : boolean; // hides the sat from viewing
 } 
@@ -37,7 +37,7 @@ export default class SatelliteManager {
   /**
    * @brief Updater set in SatelliteList, triggers reacts whenever value is changed
    */
-  public setUpdater(setState: React.Dispatch<React.SetStateAction<Map<string, Satellite_Details>>>) {
+  public setUpdater(setState: React.Dispatch<React.SetStateAction<boolean>>) {
     this.setTrigger = setState;
   }
 
@@ -53,7 +53,7 @@ export default class SatelliteManager {
   public async add(satelliteData: satellite_search_params) {
     try {
       // Initialize Satellite_Details object using the provided data
-      const selected_sat: Satellite_Details = new Satellite_(satelliteData);
+      const selected_sat : Satellite_Details = new Satellite_(satelliteData);
       
       // Fetch TLE data based on the NORAD ID
       await selected_sat.fetch_TLEs();

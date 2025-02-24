@@ -5,12 +5,20 @@ WORKDIR /app
 
 # Copy dependency definitions.
 COPY package.json ./
+# COPY package-lock.json ./
 
 # Install dependencies.
 RUN npm install
+RUN npm install three
+RUN npm install --save-dev @types/three
+RUN npm install three-orbitcontrols 
 
 # Copy the rest of the application code.
 COPY . .
+
+
+# Build the production version of the app.
+RUN npm run build
 
 # Expose the port the app runs on.
 EXPOSE 3000

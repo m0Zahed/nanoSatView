@@ -6,6 +6,7 @@ import { useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import AutocompleteSearchBar from '@/components/AutocompleteSearchBar';
 import Engine from '../components/Engine';
+import { satellite_search_params } from '@/interfaces/sat_data_intf';
 
 const inter = Inter({ subsets: ['latin'] });
 

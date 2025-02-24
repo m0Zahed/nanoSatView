@@ -1,4 +1,6 @@
 import AxesManager from './AxesManager.ts';
+import * as THREE from 'three';
+import planet from './planet.ts';
 import sunLight from './sunLight.js';
 
 export default class frameManager {
@@ -13,7 +15,7 @@ export default class frameManager {
    *        - Adding objects to frames
    *        - Rendering the ECi and ECEF frames 
    */
-  constructor(length : int, planet_ : planet, sunLight_ : sunLight){
+  constructor(length : number, planet_ : planet, sunLight_ : sunLight){
     this.axeMan = new AxesManager(length);
     this.planet = planet_;
     this.sunLight = sunLight_;
@@ -66,6 +68,6 @@ export default class frameManager {
    */
   getFrameByName(frameName : "Renderer" | "ECEF" | "ECI") : THREE.Object3D
   {
-    return this.axeMan.getFrameByName(frameName);
+    return this.axeMan.getFrameByName(frameName)!;
   }
 }

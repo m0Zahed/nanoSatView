@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import * as satLIB from 'satellite.js';
 import axios from 'axios';
-import satellite_search_params from '@/interfaces/sat_data_intf.ts';
-import { satellite_position_params } from '../interfaces/sat_data_intf'
+import { satellite_search_params } from '@/interfaces/sat_data_intf.ts';
+import { satellite_position_params } from '@/interfaces/sat_data_intf'
 
 // TLE Response Interface for the Celestrak API
 interface TLE_Response_Celestrak {
@@ -13,26 +13,30 @@ interface TLE_Response_Celestrak {
 export default class Satellite implements satellite_search_params {
   // Stuff in use
   sat_id: string;
+  name: string;
+  status: string;
+  norad_cat_id: number;
 
   // Stuff not in use 
-  norad_follow_id: number | null;
-  names: string | null;
-  image: string | null;
-  decayed: Date | null;
-  launched: Date | null;
-  deployed: Date | null;
-  website: string | null;
-  operator: string | null;
-  countries: string | null;
-  telemetries: any[] | null;
-  updated: Date | null;
-  citation: string | null;
-  is_frequency_violator: boolean | null;
-  associated_satellites: any[] | null;
+  // norad_follow_id: number | null;
+  // names: string | null;
+  // image: string | null;
+  // decayed: Date | null;
+  // launched: Date | null;
+  // deployed: Date | null;
+  // website: string | null;
+  // operator: string | null;
+  // countries: string | null;
+  // telemetries: any[] | null;
+  // updated: Date | null;
+  // citation: string | null;
+  // is_frequency_violator: boolean | null;
+  // associated_satellites: any[] | null;
 
   // Other Stuff used here
   Celestrak_API_url : string;
   ivan_API_url : string;
+  ISS_ivan_API_url : string;
   ISS_Celestrak_API_url : string; 
 
   static earthRadius : number; 
@@ -40,9 +44,9 @@ export default class Satellite implements satellite_search_params {
   static altitude : number;
   
   positions : THREE.Vector3[];
-  MarkerMesh : THREE.Mesh;
-  orbitLine : THREE.Line;
-  TLE_lines : TLE_Response_Celestrak; 
+  MarkerMesh!: THREE.Mesh;
+  orbitLine! : THREE.Line;
+  TLE_lines! : TLE_Response_Celestrak; 
   satrec : any; 
 
   /**
@@ -56,9 +60,9 @@ export default class Satellite implements satellite_search_params {
     this.status = data.status;
 
     //environment variable for drawing the orbit 
-    this.earthRadius = 5;
-    this.scaleFactor = this.earthRadius / 6371; // 6371 is the approximate radius of the Earth in km
-    this.altitude = 0.314; // scaled altitude for ISS
+    Satellite.earthRadius = 5;
+    Satellite.scaleFactor = Satellite.earthRadius / 6371; // 6371 is the approximate radius of the Earth in km
+    Satellite.altitude = 0.314; // scaled altitude for ISS
 
     // To simply test 
     const iss_test_sat = {name: "ISS", status: "active", norad_cat_id: 25544};
@@ -70,49 +74,60 @@ export default class Satellite implements satellite_search_params {
     this.positions = [];
   }
 
-  updated_parameters() : satellite_position_params {
+  updated_parameters() : satellite_position_params | undefined {
 
     const currentDate = new Date();
     const time = new Date(currentDate.getTime());
     const positionAndVelocity = satLIB.propagate(this.satrec, time);
     const positionEci = positionAndVelocity.position;
+    const velocity = positionAndVelocity.velocity;
 
-    const gmst = satLIB.gstime(time);
-    const positionGd = satLIB.eciToGeodetic(positionEci, gmst);
-    const longitude = positionGd.longitude * (180 / Math.PI);
-    const latitude = positionGd.latitude * (180 / Math.PI);
-    const height = (positionGd.height * this.scaleFactor) + this.earthRadius + this.altitude; // Scale height
+    if (
+      positionEci && typeof positionEci !== 'boolean' &&
+      velocity && typeof velocity !== 'boolean'
+    ) {
+      const gmst = satLIB.gstime(time);
+      const positionGd = satLIB.eciToGeodetic(positionEci, gmst);
+      const longitude = positionGd.longitude * (180 / Math.PI);
+      const latitude = positionGd.latitude * (180 / Math.PI);
+      const height =
+        (positionGd.height * Satellite.scaleFactor) +
+        Satellite.earthRadius +
+        Satellite.altitude;
 
-    return {
-      velocity: positionAndVelocity.velocity,
-      latitude: latitude,
-      longitude: longitude,
-      elevation: positionGd.height, // or positionGd.height, depending on your intended value
-      last_update_time: time,
-    };
-
+      return {
+        velocity: velocity, // now guaranteed to be EciVec3<number>
+        latitude: latitude,
+        longitude: longitude,
+        elevation: positionGd.height,
+        last_update_time: time,
+      };
+    } else {
+      console.error('Invalid position or velocity data.');
+      // Handle the error scenario appropriately.
+    }
   }
 
   toJSON() {
     return {
       sat_id: this.sat_id,
       norad_cat_id: this.norad_cat_id,
-      norad_follow_id: this.norad_follow_id,
+      // norad_follow_id: this.norad_follow_id,
       name: this.name,
-      names: this.names,
-      image: this.image,
+      // names: this.names,
+      // image: this.image,
       status: this.status,
-      decayed: this.decayed ? this.decayed.toISOString() : null,
-      launched: this.launched.toISOString(),
-      deployed: this.deployed ? this.deployed.toISOString() : null,
-      website: this.website,
-      operator: this.operator,
-      countries: this.countries,
-      telemetries: this.telemetries,
-      updated: this.updated.toISOString(),
-      citation: this.citation,
-      is_frequency_violator: this.is_frequency_violator,
-      associated_satellites: this.associated_satellites,
+      // decayed: this.decayed ? this.decayed.toISOString() : null,
+      // launched: this.launched.toISOString(),
+      // deployed: this.deployed ? this.deployed.toISOString() : null,
+      // website: this.website,
+      // operator: this.operator,
+      // countries: this.countries,
+      // telemetries: this.telemetries,
+      // updated: this.updated.toISOString(),
+      // citation: this.citation,
+      // is_frequency_violator: this.is_frequency_violator,
+      // associated_satellites: this.associated_satellites,
     };
   }
   
@@ -124,7 +139,7 @@ export default class Satellite implements satellite_search_params {
     try {
 
       const response = await axios.get<TLE_Response_Celestrak>(this.ivan_API_url);
-      if(response === this.TLE_lines) {
+      if(response.data === this.TLE_lines) {  // ERROR HERE (Axios Response <TLE_Response_Celestrak> does not match TLE_Response_Celestrak)
         to_return = false;
       }
       else {
@@ -159,7 +174,7 @@ export default class Satellite implements satellite_search_params {
       if(!data.line1 || !data.line2) {
 
         // Parse `line1` and `line2` if `response.data` is a single string
-        const tleLines = data.split('\n').map((line) => line.trim());
+        const tleLines = data.split('\n').map((line : any) => line.trim());
         const line1 = tleLines[1]; // First TLE line
         const line2 = tleLines[2]; // Second TLE line
         return {line1 : line1, line2: line2};
@@ -178,12 +193,12 @@ export default class Satellite implements satellite_search_params {
       const positionAndVelocity = satLIB.propagate(this.satrec, time);
       const positionEci = positionAndVelocity.position;
 
-      if (positionEci) {
+      if (positionEci && typeof positionEci !== 'boolean') {
         const gmst = satLIB.gstime(time);
-        const positionGd = satLIB.eciToGeodetic(positionEci, gmst);
+        const positionGd = satLIB.eciToGeodetic(positionEci, gmst); // ERROR HERE
         const longitude = positionGd.longitude * (180 / Math.PI);
         const latitude = positionGd.latitude * (180 / Math.PI);
-        const height = (positionGd.height * this.scaleFactor) + this.earthRadius + this.altitude; // Scale height
+        const height = (positionGd.height * Satellite.scaleFactor) + Satellite.earthRadius + Satellite.altitude; // Scale height
 
         const x = height * Math.cos(latitude * Math.PI / 180) * Math.cos(longitude * Math.PI / 180);
         const y = height * Math.cos(latitude * Math.PI / 180) * Math.sin(longitude * Math.PI / 180);
@@ -202,7 +217,7 @@ export default class Satellite implements satellite_search_params {
       console.log("Generating line, object!");
       if (!this.positions || this.positions.length === 0) {
         console.warn("Positions array is empty or undefined. No line generated.");
-        return null;  // Return null instead of throwing an error
+        return;  // Return null instead of throwing an error
       }
 
       const orbitGeometry = new THREE.BufferGeometry().setFromPoints(this.positions);
@@ -257,12 +272,12 @@ export default class Satellite implements satellite_search_params {
       const positionAndVelocity = satLIB.propagate(this.satrec, time);
       const positionEci = positionAndVelocity.position;
 
-      if (positionEci) {
+      if (positionEci && typeof positionEci !== 'boolean') {
         const gmst = satLIB.gstime(time);
-        const positionGd = satLIB.eciToGeodetic(positionEci, gmst);
+        const positionGd = satLIB.eciToGeodetic(positionEci, gmst); // ERROR HERE
         const longitude = positionGd.longitude * (180 / Math.PI);
         const latitude = positionGd.latitude * (180 / Math.PI);
-        const height = (positionGd.height * this.scaleFactor) + this.earthRadius + this.altitude; // Scale height
+        const height = (positionGd.height * Satellite.scaleFactor) + Satellite.earthRadius + Satellite.altitude; // Scale height
 
         const x = height * Math.cos(latitude * Math.PI / 180) * Math.cos(longitude * Math.PI / 180);
         const y = height * Math.cos(latitude * Math.PI / 180) * Math.sin(longitude * Math.PI / 180);

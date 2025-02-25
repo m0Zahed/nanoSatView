@@ -10,11 +10,11 @@ interface SatelliteItemProps {
 
 const SatelliteItem: React.FC<SatelliteItemProps> = ({ satellite, onToggleHidden }) => {
   const [hide_show, set_hide_show] = useState<string>("Hide");
-  const [positions, set_positions] = useState<satellite_position_params>(satellite.updated_parameters());
+  const [positions, set_positions] = useState<satellite_position_params>(satellite.updated_parameters()!);
 
   useEffect(() => {
     const intervalId = setInterval(() => {
-      set_positions(satellite.updated_parameters());
+      set_positions(satellite.updated_parameters()!);
     }, 1000);
 
     // Cleanup the interval on component unmount
@@ -22,9 +22,9 @@ const SatelliteItem: React.FC<SatelliteItemProps> = ({ satellite, onToggleHidden
   }, []);
   
   return (
-    <ListItem key={satellite.names} divider>
+    <ListItem key={satellite.name} divider>
       <ListItemText
-        primary={satellite.names || `Satellite ${satellite.names}`}
+        primary={satellite.name || `Satellite ${satellite.name}`}
         secondary={
           <>
             <div style={{ color: 'white' }}>
@@ -51,7 +51,7 @@ const SatelliteItem: React.FC<SatelliteItemProps> = ({ satellite, onToggleHidden
       <Button
         variant="contained"
         onClick={() => { 
-          onToggleHidden(satellite.names!)
+          onToggleHidden(satellite.name!)
           hide_show === "Hide" ?
             set_hide_show("Show") : set_hide_show("Hide"); 
         }}

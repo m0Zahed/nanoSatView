@@ -18,7 +18,7 @@ class TypesenseClientSingleton {
       nodes: [
         {
           host: 'localhost',
-          port: '8108',
+          port: 8108,
           protocol: 'http',
         },
       ],

@@ -4,7 +4,6 @@ import styles from '@/styles/Home.module.css';
 import { Button, createTheme } from '@mui/material';
 import { useState } from 'react';
 import Sidebar from '@/components/Sidebar';
-import AutocompleteSearchBar from '@/components/AutocompleteSearchBar';
 import Engine from '../components/Engine';
 import { satellite_search_params } from '@/interfaces/sat_data_intf';
 
@@ -42,7 +41,6 @@ export default function Home() {
           color="primary"
           onClick={toggleSidebar}
           sx={{ position: 'absolute', top: '20px', left: '20px', zIndex: 20 }}
-          theme={theme}
         >
           {isSidebarVisible ? '' : '🔍'}
         </Button>

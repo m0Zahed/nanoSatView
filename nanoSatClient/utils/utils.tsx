@@ -1,10 +1,10 @@
 import Satellite from '@/models/satellite.ts';
 import * as THREE from 'three';
 // import satelliteList from '@/assets/satellite_list.json';
-function getSatelliteNames() {
+function getSatelliteNames(satelliteList : any ) {
   const filteredList = satelliteList.filter((sat: any) => sat.name.toLowerCase() !== 'unknown satellite');
   const satellites = filteredList.map((sat: any) => new Satellite(sat));
-  return satellites.map(sat => ({ name: sat.name }));
+  return satellites.map((sat:any) => ({ name: sat.name }));
 }
 
 

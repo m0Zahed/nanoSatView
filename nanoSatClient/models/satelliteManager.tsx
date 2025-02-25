@@ -2,18 +2,24 @@ import Satellite_ from "./satellite.ts";
 import * as THREE from 'three';
 import { satellite_search_params }  from '../interfaces/sat_data_intf';
 
-export interface Satellite_Details extends Satellite_ {
-   checked : boolean; // deletes the satellite 
-   hidden : boolean; // hides the sat from viewing
+export class Satellite_Details extends Satellite_ {
+  checked: boolean ; // deletes the satellite 
+  hidden: boolean ; // hides the sat from viewing
+
+  constructor(data: satellite_search_params) {
+    super(data);
+    this.checked = false;
+    this.hidden = false;
+  }
 } 
 
 export default class SatelliteManager {
   
   tracked_satellites : Map<string, Satellite_Details>;
-  earthRadius : number;
-  scaleFactor : number; 
-  altitude : number;
-  Celestrak_API_url : string;
+  earthRadius! : number;
+  scaleFactor! : number; 
+  altitude! : number;
+  Celestrak_API_url! : string;
   mainScene : THREE.Scene;
   setTrigger?: React.Dispatch<React.SetStateAction<boolean>>;
 
@@ -53,7 +59,7 @@ export default class SatelliteManager {
   public async add(satelliteData: satellite_search_params) {
     try {
       // Initialize Satellite_Details object using the provided data
-      const selected_sat : Satellite_Details = new Satellite_(satelliteData);
+      const selected_sat : Satellite_Details = new Satellite_Details(satelliteData);
       
       // Fetch TLE data based on the NORAD ID
       await selected_sat.fetch_TLEs();
@@ -81,13 +87,13 @@ export default class SatelliteManager {
     try{ 
        
       // '!' added to ensure that the satellite is definitely found
-      const selected_sat : Satellite_ = this.tracked_satellites.get(sat_name)!;
+      const selected_sat : Satellite_Details = this.tracked_satellites.get(sat_name)!;
       if(await selected_sat.fetch_TLEs()) {
         selected_sat.create_3d_models(); 
         selected_sat.init();
-        this.show(selected_sat);
+        this.show(selected_sat.name);
         selected_sat.checked = true;
-        this.tracked_satellites[sat_name] = selected_sat;
+        this.tracked_satellites.set(sat_name, selected_sat);
       } else {
        console.log("The TLE's have no updates.");
       }
@@ -128,7 +134,7 @@ export default class SatelliteManager {
    */
   public hide(sat_name : string) : void {
     if(this.has(sat_name)) {
-      const active_sat : Satellite_ = this.tracked_satellites.get(sat_name)!;
+      const active_sat : Satellite_Details = this.tracked_satellites.get(sat_name)!;
       this.mainScene.remove(active_sat.get_orbit());  
       this.mainScene.remove(active_sat.get_marker());  
       active_sat.hidden = true;
@@ -140,7 +146,7 @@ export default class SatelliteManager {
    */
   public show(sat_name : string) : void {
     if(this.has(sat_name)) {
-      const active_sat : Satellite_ = this.tracked_satellites.get(sat_name)!;
+      const active_sat : Satellite_Details = this.tracked_satellites.get(sat_name)!;
       this.mainScene.add(active_sat.get_orbit());  
       this.mainScene.add(active_sat.get_marker());  
       active_sat.hidden = false;

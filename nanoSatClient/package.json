@@ -1,0 +1,45 @@
+{
+  "name": "sat",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "14.2.4",
+    "@babel/runtime": "^7.24.7",
+    "@emotion/react": "^11.11.4",
+    "@emotion/styled": "^11.11.5",
+    "@mui/icons-material": "^5.15.20",
+    "@mui/material": "^5.16.14",
+    "@nextui-org/autocomplete": "^2.1.2",
+    "@nextui-org/react": "^2.4.2",
+    "@nextui-org/system": "^2.2.2",
+    "@nextui-org/theme": "^2.2.6",
+    "axios": "^1.7.2",
+    "framer-motion": "^11.2.11",
+    "fs": "^0.0.1-security",
+    "mui": "^0.0.1",
+    "react": "^18.3.1",
+    "react-autosuggest": "^10.1.0",
+    "react-dom": "^18.3.1",
+    "satellite.js": "^5.0.0",
+    "three": "^0.165.0",
+    "three.meshline": "^1.4.0",
+    "typesense": "^1.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-autosuggest": "^10.1.11",
+    "@types/react-dom": "^18",
+    "@types/three": "^0.173.0",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.4",
+    "typescript": "^5"
+  }
+}

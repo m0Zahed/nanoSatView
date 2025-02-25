@@ -37,10 +37,7 @@ Features added:
 3. Enjoy the visualisation!
 ![image](https://github.com/user-attachments/assets/2f362e8c-8f11-4b2f-b8a5-903129e5b5a8)
 
-#### Hosting
- 
-
-#### Contributions & Collaboration
+### Contributions & Collaboration
 Improvements to nanoSatView are always welcome. Please contact @m0Zahed to get started.
 
 Code contributions are not the only way to help out. Documentation is in the works but feel free to reach out if you want to fit the program to your requirements.
@@ -51,5 +48,5 @@ Code contributions are not the only way to help out. Documentation is in the wor
 - Server is hosted with AWS.
 
 
-#### License
+### License
 Affero GPLv3 http://www.gnu.org/licenses/agpl-3.0.html

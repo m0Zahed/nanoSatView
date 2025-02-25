@@ -44,7 +44,7 @@ Code contributions are not the only way to help out. Documentation is in the wor
 
 **Additional information**
 - 'components/Engine.tsx' contains most of the core functionalities (Globe renderer, frame managing, orbit plotting).
-- Backend is currently only composed of a typesense server with serves satellite details. 
+- Backend is currently only composed of a typesense server which serves satellite details. 
 - Server is hosted with AWS.
 
 

@@ -11,7 +11,8 @@
 [![Framer Motion](https://img.shields.io/badge/framer--motion-11.2.11-blue?logo=framer&logoColor=white)](https://github.com/topics/framer-motion)  
 [![TypeScript](https://img.shields.io/badge/typescript-5.0-blue?logo=typescript&logoColor=white)](https://github.com/topics/typescript)  
 [![Docker](https://img.shields.io/badge/docker-blue?logo=docker&logoColor=white)](https://github.com/topics/docker)
-nanoSatView is an application for visualizing satellite data in 3D. It leverages modern web technologies to provide an interactive interface for tracking satellite orbits, displaying TLE data, and searching satellite information. Built with Next.js and React, nanoSatView combines 3D rendering with real-time data for an immersive user experience.
+
+**nanoSatView** is an application for visualizing satellite data in 3D. It leverages modern web technologies to provide an interactive interface for tracking satellite orbits, displaying TLE data, and searching satellite information. Built with Next.js and React, nanoSatView combines 3D rendering with real-time data for an immersive user experience.
 
 #### v0.1 Changelog
 ---

@@ -14,8 +14,9 @@
 
 **nanoSatView** is an application for visualizing satellite data in 3D. It leverages modern web technologies to provide an interactive interface for tracking satellite orbits, displaying TLE data, and searching satellite information. Built with Next.js and React, nanoSatView combines 3D rendering with real-time data for an immersive user experience.
 
-#### v0.1 Changelog
 ---
+
+#### v0.1 Changelog
 
 Features added:
 - Orbit visualizer in ECEF frame. 
@@ -28,7 +29,6 @@ Features added:
 
 
 #### Usage
----
 
 1. Click the search icon in the top left corner. 
 ![image](https://github.com/user-attachments/assets/5b2fcb00-c71b-4114-9faf-f06c94c0be50)
@@ -37,3 +37,19 @@ Features added:
 3. Enjoy the visualisation!
 ![image](https://github.com/user-attachments/assets/2f362e8c-8f11-4b2f-b8a5-903129e5b5a8)
 
+#### Hosting
+ 
+
+#### Contributions & Collaboration
+Improvements to nanoSatView are always welcome. Please contact @m0Zahed to get started.
+
+Code contributions are not the only way to help out. Documentation is in the works but feel free to reach out if you want to fit the program to your requirements.
+
+**Additional information**
+- 'components/Engine.tsx' contains most of the core functionalities (Globe renderer, frame managing, orbit plotting).
+- Backend is currently only composed of a typesense server with serves satellite details. 
+- Server is hosted with AWS.
+
+
+#### License
+Affero GPLv3 http://www.gnu.org/licenses/agpl-3.0.html

@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "next": "14.2.4",
     "@babel/runtime": "^7.24.7",
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.5",
@@ -22,7 +23,6 @@
     "framer-motion": "^11.2.11",
     "fs": "^0.0.1-security",
     "mui": "^0.0.1",
-    "next": "^14.2.4",
     "react": "^18.3.1",
     "react-autosuggest": "^10.1.0",
     "react-dom": "^18.3.1",

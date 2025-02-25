@@ -238,3 +238,24 @@
     transform: rotate(0deg);
   }
 }
+
+.header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  /* Spacey background gradient */
+  background: linear-gradient(135deg, #141e30, #243b55);
+  padding: 1rem;
+  margin-bottom: 2rem; /* space after header */
+}
+
+.header a {
+  font-family: 'Orbitron', sans-serif; 
+  font-size: 2rem;
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.header a:hover {
+  color: #ffcc00; /* a highlight color on hover */
+}

@@ -4,7 +4,7 @@ const Typesense = require('typesense');
 let client = new Typesense.Client({
   nodes: [{
     host: 'localhost',  // Adjust if your Typesense server is not local
-    port: '8108',       // Default Typesense port
+    port: '8200',       // Default Typesense port
     protocol: 'http'    // Use 'https' for secure connections
   }],
   apiKey: 'xyz',  

@@ -29,8 +29,9 @@ Features added:
     3. Constellations
     4. Notifications for overpasses
 
+---
 
-#### Usage
+## Usage
 
 1. Click the search icon in the top left corner. 
 ![image](https://github.com/user-attachments/assets/5b2fcb00-c71b-4114-9faf-f06c94c0be50)

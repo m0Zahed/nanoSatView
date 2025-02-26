@@ -19,6 +19,17 @@ Features added:
 - A huge database of the latest list of nanosats sent to space.
 
 
+## Upcoming Features for version v0.2 
+
+- Free API to fetch positional data.
+- Integration with LimeSDR.
+- Visualisation Features:
+    1. Orbit duration controls
+    2. Real-time solar longitude position.
+    3. Constellations
+    4. Notifications for overpasses
+
+
 #### Usage
 
 1. Click the search icon in the top left corner. 

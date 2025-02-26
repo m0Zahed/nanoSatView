@@ -33,9 +33,9 @@ Features added:
 
 ## Usage
 
-![image](https://github.com/user-attachments/assets/5b2fcb00-c71b-4114-9faf-f06c94c0be50)
-![image](https://github.com/user-attachments/assets/ee6bd3b2-94f4-4793-bb05-255f92abbaab)
-![image](https://github.com/user-attachments/assets/bf910ea3-c557-4fa4-af03-d5f5b2f0fc0a)
+<img src="https://github.com/user-attachments/assets/5b2fcb00-c71b-4114-9faf-f06c94c0be50" style="width:80px;height:80px;" alt="Image 1">
+<img src="https://github.com/user-attachments/assets/ee6bd3b2-94f4-4793-bb05-255f92abbaab" style="width:200px;height:400px;" alt="Image 2">
+<img src="https://github.com/user-attachments/assets/bf910ea3-c557-4fa4-af03-d5f5b2f0fc0a" style="width:400px;height:400px;" alt="Image 3">
 
 1. Click the search icon in the top left corner.
 2. Search for your desired nanosat.

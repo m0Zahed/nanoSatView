@@ -33,12 +33,12 @@ Features added:
 
 ## Usage
 
-1. Click the search icon in the top left corner. 
 ![image](https://github.com/user-attachments/assets/5b2fcb00-c71b-4114-9faf-f06c94c0be50)
-2. Search for your desired nanosat.
 ![image](https://github.com/user-attachments/assets/ee6bd3b2-94f4-4793-bb05-255f92abbaab)
+
+1. Click the search icon in the top left corner.
+2. Search for your desired nanosat.
 3. Enjoy the visualisation!
-![image](https://github.com/user-attachments/assets/2f362e8c-8f11-4b2f-b8a5-903129e5b5a8)
 
 ### Contributions & Collaboration
 Improvements to nanoSatView are always welcome. Please contact @m0Zahed to get started.

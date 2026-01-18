@@ -259,3 +259,120 @@
 .header a:hover {
   color: #ffcc00; /* a highlight color on hover */
 }
+
+.dashboard {
+  min-height: calc(100vh - 110px);
+  padding: 3rem 6vw 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+  background: radial-gradient(circle at top, rgba(36, 59, 85, 0.45), transparent 60%),
+    linear-gradient(160deg, #0d1424 0%, #111f33 45%, #1b2f4b 100%);
+  color: #eef3ff;
+}
+
+.dashboardHero {
+  max-width: 760px;
+}
+
+.dashboardTitle {
+  font-size: clamp(2.2rem, 4vw, 3.4rem);
+  letter-spacing: 0.04em;
+  margin-bottom: 0.8rem;
+}
+
+.dashboardSubtitle {
+  font-size: 1.1rem;
+  color: rgba(238, 243, 255, 0.75);
+  line-height: 1.6;
+  margin-bottom: 1.8rem;
+}
+
+.dashboardActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.primaryButton,
+.secondaryButton {
+  border-radius: 999px;
+  padding: 0.85rem 1.8rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
+}
+
+.primaryButton {
+  background: linear-gradient(130deg, #33eb91 0%, #2cb0ff 100%);
+  color: #0c1322;
+  text-decoration: none;
+  box-shadow: 0 10px 24px rgba(44, 176, 255, 0.25);
+}
+
+.secondaryButton {
+  background: rgba(255, 255, 255, 0.12);
+  color: #eef3ff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.primaryButton:hover,
+.secondaryButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
+}
+
+.dashboardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem;
+}
+
+.dashboardCard {
+  padding: 1.4rem;
+  border-radius: 18px;
+  background: rgba(9, 17, 32, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 16px 30px rgba(7, 12, 22, 0.35);
+}
+
+.dashboardCard h2 {
+  font-size: 1.1rem;
+  margin-bottom: 0.6rem;
+}
+
+.dashboardCard p {
+  margin: 0;
+  color: rgba(238, 243, 255, 0.72);
+  line-height: 1.5;
+}
+
+.engineBackLink {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  z-index: 20;
+  background: rgba(15, 23, 37, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 0.55rem 1.2rem;
+  border-radius: 999px;
+  color: #eef3ff;
+  text-decoration: none;
+}
+
+.engineBackLink:hover {
+  color: #ffcc00;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+@media (max-width: 700px) {
+  .dashboard {
+    padding: 2.5rem 8vw 3.5rem;
+  }
+
+  .dashboardActions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

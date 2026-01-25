@@ -32,21 +32,29 @@ export function TimelineView({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-slate-800">
+    <div className="flex-1 flex flex-col h-full bg-[#1a1a1a]">
+      {/* Film Grain Texture Overlay */}
+      <div 
+        className="fixed inset-0 opacity-[0.03] pointer-events-none z-10 mix-blend-overlay"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+        }}
+      />
+
       {/* Header */}
-      <div className="bg-slate-900 border-b border-slate-700 px-6 py-4">
+      <div className="bg-[#1a1a1a] border-b border-white/10 px-6 py-4 relative">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white">Timeline</h1>
-            <p className="text-sm text-slate-400 mt-1">{projectName}</p>
+            <h1 className="text-2xl font-bold text-white font-mono tracking-wider">TIMELINE</h1>
+            <p className="text-sm text-gray-500 mt-1 font-mono">{projectName}</p>
           </div>
           {!isEditing && timeline && (
             <Button
               onClick={() => setIsEditing(true)}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-white/10 hover:bg-white/20 text-white border border-white/20 font-mono"
             >
               <Edit2 className="h-4 w-4 mr-2" />
-              Edit Timeline
+              EDIT
             </Button>
           )}
         </div>
@@ -56,10 +64,16 @@ export function TimelineView({
       <ScrollArea className="flex-1">
         <div className="p-6 max-w-4xl">
           {isEditing ? (
-            <Card className="p-6 bg-slate-900 border-slate-700">
-              <div className="space-y-6">
+            <div className="relative p-6 bg-[#222222] border border-white/10">
+              {/* Corner Accents */}
+              <div className="absolute -top-1 -left-1 w-4 h-4 border-l border-t border-white/20" />
+              <div className="absolute -top-1 -right-1 w-4 h-4 border-r border-t border-white/20" />
+              <div className="absolute -bottom-1 -left-1 w-4 h-4 border-l border-b border-white/20" />
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 border-r border-b border-white/20" />
+              
+              <div className="space-y-6 relative">
                 <div className="space-y-2">
-                  <Label htmlFor="timeline-description" className="text-white">
+                  <Label htmlFor="timeline-description" className="text-gray-300 font-mono text-xs tracking-wider uppercase">
                     Timeline Description
                   </Label>
                   <Textarea
@@ -67,14 +81,14 @@ export function TimelineView({
                     placeholder="Describe the project timeline, key dates, and milestones..."
                     value={timelineText}
                     onChange={(e) => setTimelineText(e.target.value)}
-                    className="bg-slate-800 border-slate-600 text-white min-h-[200px]"
+                    className="bg-[#1a1a1a] border-white/10 text-gray-300 font-mono min-h-[200px] placeholder:text-gray-600"
                     autoFocus
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="start-date" className="text-white">
+                    <Label htmlFor="start-date" className="text-gray-300 font-mono text-xs tracking-wider uppercase">
                       Start Date (Optional)
                     </Label>
                     <Input
@@ -82,11 +96,11 @@ export function TimelineView({
                       type="date"
                       value={startDate}
                       onChange={(e) => setStartDate(e.target.value)}
-                      className="bg-slate-800 border-slate-600 text-white"
+                      className="bg-[#1a1a1a] border-white/10 text-gray-300 font-mono"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="end-date" className="text-white">
+                    <Label htmlFor="end-date" className="text-gray-300 font-mono text-xs tracking-wider uppercase">
                       End Date (Optional)
                     </Label>
                     <Input
@@ -94,7 +108,7 @@ export function TimelineView({
                       type="date"
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
-                      className="bg-slate-800 border-slate-600 text-white"
+                      className="bg-[#1a1a1a] border-white/10 text-gray-300 font-mono"
                     />
                   </div>
                 </div>
@@ -102,10 +116,10 @@ export function TimelineView({
                 <div className="flex gap-2 pt-4">
                   <Button
                     onClick={handleSave}
-                    className="bg-blue-600 hover:bg-blue-700"
+                    className="bg-white/10 hover:bg-white/20 text-white border border-white/20 font-mono"
                   >
                     <Save className="h-4 w-4 mr-2" />
-                    Save Timeline
+                    SAVE
                   </Button>
                   {timeline && (
                     <Button
@@ -114,60 +128,74 @@ export function TimelineView({
                         setTimelineText(timeline);
                       }}
                       variant="outline"
-                      className="border-slate-600"
+                      className="border-white/20 text-gray-400 hover:text-white hover:bg-white/5 font-mono"
                     >
                       <X className="h-4 w-4 mr-2" />
-                      Cancel
+                      CANCEL
                     </Button>
                   )}
                 </div>
               </div>
-            </Card>
+            </div>
           ) : timeline ? (
             <div className="space-y-6">
-              <Card className="p-6 bg-slate-900 border-slate-700">
-                <div className="flex items-start gap-4">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-600/20">
-                    <Calendar className="h-5 w-5 text-blue-400" />
+              <div className="relative p-6 bg-[#222222] border border-white/10">
+                {/* Corner Accents */}
+                <div className="absolute -top-1 -left-1 w-4 h-4 border-l border-t border-white/20" />
+                <div className="absolute -top-1 -right-1 w-4 h-4 border-r border-t border-white/20" />
+                <div className="absolute -bottom-1 -left-1 w-4 h-4 border-l border-b border-white/20" />
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 border-r border-b border-white/20" />
+                
+                <div className="flex items-start gap-4 relative">
+                  <div className="flex items-center justify-center w-10 h-10 bg-white/5 border border-white/10">
+                    <Calendar className="h-5 w-5 text-gray-300" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-white mb-2">Project Timeline</h3>
-                    <p className="text-slate-300 whitespace-pre-wrap">{timeline}</p>
+                    <h3 className="text-lg font-semibold text-white mb-2 font-mono tracking-wide">PROJECT TIMELINE</h3>
+                    <p className="text-gray-300 whitespace-pre-wrap font-mono text-sm leading-relaxed">{timeline}</p>
                   </div>
                 </div>
-              </Card>
+              </div>
 
               {startDate && endDate && (
-                <Card className="p-6 bg-slate-900 border-slate-700">
-                  <h3 className="text-lg font-semibold text-white mb-4">Duration</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-slate-400 mb-1">Start Date</p>
-                      <p className="text-white font-medium">{startDate}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-400 mb-1">End Date</p>
-                      <p className="text-white font-medium">{endDate}</p>
+                <div className="relative p-6 bg-[#222222] border border-white/10">
+                  {/* Corner Accents */}
+                  <div className="absolute -top-1 -left-1 w-4 h-4 border-l border-t border-white/20" />
+                  <div className="absolute -top-1 -right-1 w-4 h-4 border-r border-t border-white/20" />
+                  <div className="absolute -bottom-1 -left-1 w-4 h-4 border-l border-b border-white/20" />
+                  <div className="absolute -bottom-1 -right-1 w-4 h-4 border-r border-b border-white/20" />
+                  
+                  <div className="relative">
+                    <h3 className="text-lg font-semibold text-white mb-4 font-mono tracking-wide">DURATION</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-gray-500 mb-1 font-mono uppercase tracking-wider">Start Date</p>
+                        <p className="text-white font-medium font-mono">{startDate}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500 mb-1 font-mono uppercase tracking-wider">End Date</p>
+                        <p className="text-white font-medium font-mono">{endDate}</p>
+                      </div>
                     </div>
                   </div>
-                </Card>
+                </div>
               )}
             </div>
           ) : (
             <div className="text-center py-16">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-700 mb-4">
-                <Calendar className="h-8 w-8 text-slate-400" />
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-white/5 border border-white/10 mb-4">
+                <Calendar className="h-8 w-8 text-gray-400" />
               </div>
-              <h3 className="text-lg font-medium text-white mb-2">No timeline set</h3>
-              <p className="text-slate-400 mb-6">
+              <h3 className="text-lg font-medium text-white mb-2 font-mono tracking-wide">NO TIMELINE SET</h3>
+              <p className="text-gray-500 mb-6 font-mono text-sm">
                 Add a timeline to track important dates and milestones
               </p>
               <Button
                 onClick={() => setIsEditing(true)}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-white/10 hover:bg-white/20 text-white border border-white/20 font-mono"
               >
                 <Calendar className="h-4 w-4 mr-2" />
-                Add Timeline
+                ADD TIMELINE
               </Button>
             </div>
           )}

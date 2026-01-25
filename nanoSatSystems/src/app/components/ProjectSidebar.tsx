@@ -38,6 +38,7 @@ interface ProjectSidebarProps {
   onDeleteProject: (id: string) => void;
   onOpenSettings: () => void;
   onAddMember: (projectId: string) => void;
+  onViewMembers: (projectId: string) => void;
   onOpenOperationalFlow: (projectId: string) => void;
   onAddRequirements: (projectId: string) => void;
   onAddTimeline: (projectId: string) => void;
@@ -53,6 +54,7 @@ export function ProjectSidebar({
   onDeleteProject,
   onOpenSettings,
   onAddMember,
+  onViewMembers,
   onOpenOperationalFlow,
   onAddRequirements,
   onAddTimeline,
@@ -158,22 +160,30 @@ export function ProjectSidebar({
                 {/* Member icons */}
                 {project.members && project.members.length > 0 && (
                   <div className="flex items-center gap-0.5 px-2 mt-1 ml-6">
-                    {project.members.slice(0, 4).map((member, index) => (
-                      <Avatar
-                        key={member.id}
-                        className="h-5 w-5 border border-white/10"
-                        style={{ marginLeft: index > 0 ? '-6px' : '0' }}
-                      >
-                        <AvatarFallback className="text-[9px] bg-[#222222] text-gray-300 font-mono">
-                          {member.initials}
-                        </AvatarFallback>
-                      </Avatar>
-                    ))}
-                    {project.members.length > 4 && (
-                      <div className="h-5 w-5 rounded-full bg-[#222222] border border-white/10 flex items-center justify-center text-[8px] text-gray-400 font-mono" style={{ marginLeft: '-6px' }}>
-                        +{project.members.length - 4}
-                      </div>
-                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewMembers(project.id);
+                      }}
+                      className="flex items-center gap-0.5 hover:opacity-80 transition-opacity"
+                    >
+                      {project.members.slice(0, 4).map((member, index) => (
+                        <Avatar
+                          key={member.id}
+                          className="h-5 w-5 border border-white/10"
+                          style={{ marginLeft: index > 0 ? '-6px' : '0' }}
+                        >
+                          <AvatarFallback className="text-[9px] bg-[#222222] text-gray-300 font-mono">
+                            {member.initials}
+                          </AvatarFallback>
+                        </Avatar>
+                      ))}
+                      {project.members.length > 4 && (
+                        <div className="h-5 w-5 rounded-full bg-[#222222] border border-white/10 flex items-center justify-center text-[8px] text-gray-400 font-mono" style={{ marginLeft: '-6px' }}>
+                          +{project.members.length - 4}
+                        </div>
+                      )}
+                    </button>
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -203,7 +213,7 @@ export function ProjectSidebar({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              onAddMember(project.id);
+                              onViewMembers(project.id);
                             }}
                             className="h-5 w-5 rounded-full bg-[#222222] hover:bg-white hover:text-black border border-white/10 flex items-center justify-center transition-colors"
                           >

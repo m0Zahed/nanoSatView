@@ -1,30 +1,25 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { Upload } from 'lucide-react';
-import * as THREE from 'three';
-import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 interface StlViewerProps {
   className?: string;
 }
 
 export function StlViewer({ className = '' }: StlViewerProps) {
-  const [geometry, setGeometry] = useState<THREE.BufferGeometry | null>(null);
+  const [hasModel, setHasModel] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<{
-    scene: THREE.Scene;
-    camera: THREE.PerspectiveCamera;
-    renderer: THREE.WebGLRenderer;
-    controls: OrbitControls;
-    mesh: THREE.Mesh | null;
-    animationId: number | null;
-  } | null>(null);
+  const sceneRef = useRef<any>(null);
 
-  // Initialize Three.js scene
-  useEffect(() => {
-    if (!containerRef.current || !geometry) return;
+  // Lazy load Three.js only when needed
+  const initializeScene = useCallback(async (geometry: any) => {
+    if (!containerRef.current) return;
+
+    // Dynamically import Three.js to avoid loading it until needed
+    const THREE = await import('three');
+    const { STLLoader } = await import('three/examples/jsm/loaders/STLLoader.js');
+    const { OrbitControls } = await import('three/examples/jsm/controls/OrbitControls.js');
 
     const container = containerRef.current;
     const width = container.clientWidth;
@@ -76,13 +71,11 @@ export function StlViewer({ className = '' }: StlViewerProps) {
     controls.maxDistance = 500;
 
     // Animation loop
+    let animationId: number;
     const animate = () => {
-      const id = requestAnimationFrame(animate);
+      animationId = requestAnimationFrame(animate);
       controls.update();
       renderer.render(scene, camera);
-      if (sceneRef.current) {
-        sceneRef.current.animationId = id;
-      }
     };
     animate();
 
@@ -96,41 +89,87 @@ export function StlViewer({ className = '' }: StlViewerProps) {
     };
     window.addEventListener('resize', handleResize);
 
-    // Store references
+    // Store references for cleanup
     sceneRef.current = {
       scene,
       camera,
       renderer,
       controls,
       mesh,
-      animationId: null,
+      animationId,
+      geometry,
+      material,
+      handleResize,
     };
 
-    // Cleanup
+    setHasModel(true);
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
     return () => {
-      window.removeEventListener('resize', handleResize);
-      if (sceneRef.current?.animationId) {
-        cancelAnimationFrame(sceneRef.current.animationId);
-      }
-      controls.dispose();
-      renderer.dispose();
-      geometry.dispose();
-      material.dispose();
-      if (container.contains(renderer.domElement)) {
-        container.removeChild(renderer.domElement);
+      if (sceneRef.current) {
+        const { renderer, controls, geometry, material, handleResize, animationId } = sceneRef.current;
+        
+        if (animationId) {
+          cancelAnimationFrame(animationId);
+        }
+        
+        window.removeEventListener('resize', handleResize);
+        
+        if (controls) controls.dispose();
+        if (renderer) {
+          renderer.dispose();
+          if (containerRef.current?.contains(renderer.domElement)) {
+            containerRef.current.removeChild(renderer.domElement);
+          }
+        }
+        if (geometry) geometry.dispose();
+        if (material) material.dispose();
+        
+        sceneRef.current = null;
       }
     };
-  }, [geometry]);
+  }, []);
 
-  const handleFileLoad = useCallback((file: File) => {
+  const handleFileLoad = useCallback(async (file: File) => {
     if (!file.name.toLowerCase().endsWith('.stl')) {
       alert('Please upload a valid STL file');
       return;
     }
 
+    // Clean up existing scene if any
+    if (sceneRef.current) {
+      const { renderer, controls, geometry, material, handleResize, animationId } = sceneRef.current;
+      
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+      }
+      
+      window.removeEventListener('resize', handleResize);
+      
+      if (controls) controls.dispose();
+      if (renderer) {
+        renderer.dispose();
+        if (containerRef.current?.contains(renderer.domElement)) {
+          containerRef.current.removeChild(renderer.domElement);
+        }
+      }
+      if (geometry) geometry.dispose();
+      if (material) material.dispose();
+      
+      sceneRef.current = null;
+      setHasModel(false);
+    }
+
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const arrayBuffer = event.target?.result as ArrayBuffer;
+      
+      // Dynamically import Three.js
+      const THREE = await import('three');
+      const { STLLoader } = await import('three/examples/jsm/loaders/STLLoader.js');
+      
       const loader = new STLLoader();
       const loadedGeometry = loader.parse(arrayBuffer);
       
@@ -143,10 +182,10 @@ export function StlViewer({ className = '' }: StlViewerProps) {
       // Compute normals for proper lighting
       loadedGeometry.computeVertexNormals();
       
-      setGeometry(loadedGeometry);
+      await initializeScene(loadedGeometry);
     };
     reader.readAsArrayBuffer(file);
-  }, []);
+  }, [initializeScene]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -179,10 +218,10 @@ export function StlViewer({ className = '' }: StlViewerProps) {
   }, [handleFileLoad]);
 
   const handleClick = useCallback(() => {
-    if (!geometry) {
+    if (!hasModel) {
       fileInputRef.current?.click();
     }
-  }, [geometry]);
+  }, [hasModel]);
 
   return (
     <div className={`relative ${className}`}>
@@ -207,10 +246,10 @@ export function StlViewer({ className = '' }: StlViewerProps) {
         <div
           ref={containerRef}
           className="absolute inset-0"
-          style={{ display: geometry ? 'block' : 'none' }}
+          style={{ display: hasModel ? 'block' : 'none' }}
         />
 
-        {!geometry && (
+        {!hasModel && (
           <div
             className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer"
             onClick={handleClick}
@@ -233,10 +272,10 @@ export function StlViewer({ className = '' }: StlViewerProps) {
           <div className="absolute inset-0 bg-blue-500/10 border-4 border-blue-500 border-dashed rounded-lg pointer-events-none" />
         )}
 
-        {geometry && (
+        {hasModel && (
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="absolute top-4 right-4 px-3 py-2 bg-slate-800/90 hover:bg-slate-700 text-white text-sm rounded-lg transition-colors backdrop-blur-sm border border-slate-600"
+            className="absolute top-4 right-4 px-3 py-2 bg-slate-800/90 hover:bg-slate-700 text-white text-sm rounded-lg transition-colors backdrop-blur-sm border border-slate-600 z-10"
           >
             Load New File
           </button>

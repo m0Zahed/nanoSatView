@@ -1,38 +1,84 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Separator } from '@/app/components/ui/separator';
+import { postJson } from '@/app/auth/api';
 
 export function SignUpPage() {
   const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [picturePreview, setPicturePreview] = useState<string | null>(null);
+  const [pictureDataUrl, setPictureDataUrl] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
-  const handleSignUp = (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage(null);
     
     // Basic validation
     if (password !== confirmPassword) {
-      alert('Passwords do not match!');
+      setErrorMessage('Passwords do not match.');
       return;
     }
-    
-    // Mock sign up - just navigate to dashboard
-    localStorage.setItem('isAuthenticated', 'true');
-    localStorage.setItem('userName', name);
-    navigate('/dashboard');
+
+    setIsSubmitting(true);
+    try {
+      const { status, data } = await postJson('/auth/signup', {
+        email,
+        password,
+        fullName: name,
+        username,
+        dateOfBirth,
+        pictureUrl: pictureDataUrl,
+      });
+
+      if (status === 201) {
+        navigate('/verify-email?sent=1');
+        return;
+      }
+
+      if (status === 409) {
+        const message =
+          data && typeof data === 'object' && 'error' in data
+            ? ((data as { error: { message?: string } }).error?.message ?? 'Email already exists.')
+            : 'Email already exists.';
+        setErrorMessage(message);
+        return;
+      }
+
+      setErrorMessage('Signup failed. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleGoogleSignUp = () => {
-    // Mock Google sign up - in a real app, this would initiate OAuth flow
-    localStorage.setItem('isAuthenticated', 'true');
-    localStorage.setItem('loginMethod', 'google');
-    navigate('/dashboard');
+    window.location.href = 'http://localhost:5000/auth/google/start';
+  };
+
+  const handlePictureChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      setPicturePreview(null);
+      setPictureDataUrl(null);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : null;
+      setPicturePreview(result);
+      setPictureDataUrl(result);
+    };
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -99,6 +145,18 @@ export function SignUpPage() {
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="username">Username</Label>
+                <Input
+                  id="username"
+                  type="text"
+                  placeholder="mission_control"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                />
+                <p className="text-xs text-muted-foreground">3-20 characters, letters/numbers/underscore.</p>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
@@ -110,6 +168,32 @@ export function SignUpPage() {
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="dob">Date of Birth</Label>
+                <Input
+                  id="dob"
+                  type="date"
+                  value={dateOfBirth}
+                  onChange={(e) => setDateOfBirth(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="picture">Profile Picture (optional)</Label>
+                <Input
+                  id="picture"
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePictureChange}
+                />
+                {picturePreview && (
+                  <img
+                    src={picturePreview}
+                    alt="Profile preview"
+                    className="h-20 w-20 rounded-full object-cover border border-border"
+                  />
+                )}
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <Input
                   id="password"
@@ -117,7 +201,7 @@ export function SignUpPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  minLength={6}
+                  minLength={8}
                 />
               </div>
               <div className="space-y-2">
@@ -128,17 +212,20 @@ export function SignUpPage() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
-                  minLength={6}
+                  minLength={8}
                 />
               </div>
-              <Button type="submit" className="w-full">
-                Create Account
+              {errorMessage && (
+                <p className="text-sm text-red-500">{errorMessage}</p>
+              )}
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? 'Creating Account...' : 'Create Account'}
               </Button>
             </form>
 
             <div className="text-center text-sm text-muted-foreground">
               Already have an account?{' '}
-              <Link to="/" className="text-primary underline-offset-4 hover:underline">
+              <Link to="/login" className="text-primary underline-offset-4 hover:underline">
                 Sign in
               </Link>
             </div>

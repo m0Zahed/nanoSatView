@@ -1,49 +1,49 @@
-import { motion, useTransform, useScroll } from 'motion/react';
-import { useRef, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ArrowRight, Play, Satellite, Database, Bot, Cpu, Radio, Target } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router';
+import { motion } from 'motion/react';
+import { Satellite, ChevronRight, Zap, Shield, Users, Target, ChevronDown } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
-import capellaLogo from 'figma:asset/4cd63406e6ab2d332d6361418a9c6bf4fb53dca0.png';
-import mslLogo from 'figma:asset/4e00837761b0379aa948797089aeee4e36f60ac7.png';
-import googleSheetsLogo from 'figma:asset/79f9540991611acc8ef9e2c4cdd2e207c586005a.png';
-import diagramGptLogo from 'figma:asset/5234ef8dd429a3869ddae4436a895d1252b4570a.png';
-import githubLogo from 'figma:asset/d7c9b449ae05744848c56899970eefd75390854e.png';
-import spaceConcordiaLogo from 'figma:asset/6a7b6c6adf7621a75a857983bcd1197626b53f1d.png';
-import { Brain, Twitter, Linkedin, Github } from 'lucide-react';
+import { TypeAnimation } from 'react-type-animation';
+import capellaLogo from '@/assets/4cd63406e6ab2d332d6361418a9c6bf4fb53dca0.png';
+import mslLogo from '@/assets/4e00837761b0379aa948797089aeee4e36f60ac7.png';
+import githubLogo from '@/assets/d7c9b449ae05744848c56899970eefd75390854e.png';
+import diagramGPTLogo from '@/assets/5234ef8dd429a3869ddae4436a895d1252b4570a.png';
+import { Footer } from '@/app/components/Footer';
+
+// Pre-generated text descriptions for random selection
+const COMPLETE_PLATFORM_TEXTS = [
+  "Real-time satellite tracking and orbital prediction with sub-meter accuracy. Monitor telemetry streams, analyze anomalies, and execute command sequences through our encrypted ground station network.",
+  "Advanced trajectory optimization and attitude control analysis. Calculate delta-v requirements, design maneuver sequences, and validate guidance algorithms with industry-standard astrodynamics tools.",
+  "Integrated systems engineering environment for end-to-end mission lifecycle management. From requirements capture through operations, maintain full traceability across all project phases.",
+  "Multi-domain modeling and simulation framework supporting concurrent engineering workflows. Validate system designs against mission requirements using physics-based models and Monte Carlo analysis."
+];
+
+const EVERYTHING_YOU_NEED_TEXTS = [
+  "Semantic vector embeddings enable context-aware document retrieval across terabytes of technical documentation. Query using natural language and receive ranked results based on conceptual similarity.",
+  "Graph neural networks map relationships between requirements, design artifacts, and verification activities. Detect orphaned requirements, circular dependencies, and inconsistencies before they impact mission success.",
+  "Natural language processing extracts structured requirements from informal specifications and legacy documents. Automated traceability matrices link requirements to design elements, test cases, and verification procedures.",
+  "Transformer-based models generate test procedures from system requirements and interface specifications. Automated test oracles validate expected behaviors against actual outputs, detecting subtle anomalies."
+];
+
+const INTEGRATIONS_TEXTS = [
+  "Bidirectional synchronization ensures all connected tools maintain consistent state. Changes propagate automatically through webhooks and event-driven architecture, eliminating manual data transfer.",
+  "Multi-user concurrent editing with operational transformation algorithms. Conflict resolution engines handle simultaneous modifications across distributed teams working in different tools.",
+  "Real-time data replication across cloud and on-premises deployments. Encrypted communication channels ensure data integrity during transit. Version control integration tracks changes across CAD models.",
+  "Plugin architecture supports custom tool integrations without modifying core platform. OAuth 2.0 and SAML authentication protocols integrate with enterprise identity management systems."
+];
+
+const VIDEO_SOURCES = Object.values(
+  import.meta.glob('/public/assets/*.mp4', { eager: true, query: '?url', import: 'default' })
+) as string[];
 
 export function LandingPage() {
   const navigate = useNavigate();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const { scrollYProgress } = useScroll({
-    target: containerRef,
-    offset: ["start start", "end end"]
-  });
+  const location = useLocation();
 
   const [isMuted, setIsMuted] = useState(true);
 
-  useEffect(() => {
-    if (videoRef.current) {
-      const playPromise = videoRef.current.play();
-      
-      if (playPromise !== undefined) {
-        playPromise.catch((error) => {
-          // Auto-play was prevented, this is fine
-          console.log('Video autoplay prevented:', error);
-        });
-      }
-    }
-    
-    return () => {
-      // Cleanup: pause video when component unmounts
-      if (videoRef.current) {
-        videoRef.current.pause();
-      }
-    };
-  }, []);
-
   return (
-    <div ref={containerRef} className="bg-[#1a1a1a] relative">
+    <div className="bg-[#1a1a1a] relative">
       {/* Film Grain Texture */}
       <div 
         className="fixed inset-0 opacity-[0.15] pointer-events-none z-50 mix-blend-overlay"
@@ -69,10 +69,96 @@ export function LandingPage() {
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-3"
+            className="flex items-center gap-6"
           >
-            <Satellite className="h-8 w-8 text-gray-300" />
-            <span className="text-xl font-bold text-white font-mono tracking-wider">nanoSatView systems</span>
+            <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
+              <Satellite className="h-8 w-8 text-gray-300" />
+              <span className="text-xl font-bold text-white font-mono tracking-wider">nanoSat</span>
+            </div>
+            <div className="flex items-center gap-2 ml-4">
+              <Button
+                variant="ghost"
+                className={`font-mono rounded-none relative ${
+                  location.pathname === '/' 
+                    ? 'text-white' 
+                    : 'text-gray-300 hover:text-white hover:bg-white/5'
+                }`}
+                onClick={() => navigate('/')}
+              >
+                {location.pathname === '/' ? (
+                  <motion.span
+                    className="relative"
+                    animate={{
+                      textShadow: [
+                        '0 0 4px rgba(255,255,255,0.3), 0 0 8px rgba(255,255,255,0.2)',
+                        '0 0 8px rgba(255,255,255,0.5), 0 0 16px rgba(255,255,255,0.3)',
+                        '0 0 4px rgba(255,255,255,0.3), 0 0 8px rgba(255,255,255,0.2)',
+                      ]
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                  >
+                    Systems
+                    {/* Sparkle particles */}
+                    {[...Array(8)].map((_, i) => (
+                      <motion.span
+                        key={i}
+                        className="absolute w-1 h-1 bg-white rounded-full"
+                        style={{
+                          left: `${Math.random() * 100}%`,
+                          top: `${Math.random() * 100}%`,
+                        }}
+                        animate={{
+                          opacity: [0, 1, 0],
+                          scale: [0, 1.5, 0],
+                        }}
+                        transition={{
+                          duration: 1.5,
+                          repeat: Infinity,
+                          delay: i * 0.2,
+                          ease: "easeOut"
+                        }}
+                      />
+                    ))}
+                  </motion.span>
+                ) : (
+                  'Systems'
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                className={`font-mono rounded-none ${
+                  location.pathname === '/view'
+                    ? 'text-white'
+                    : 'text-gray-300 hover:text-white hover:bg-white/5'
+                }`}
+                onClick={() => navigate('/view')}
+              >
+                {location.pathname === '/view' ? (
+                  <motion.span
+                    animate={{
+                      textShadow: [
+                        '0 0 10px rgba(255,255,255,0.8)',
+                        '0 0 20px rgba(255,255,255,0.4)',
+                        '0 0 10px rgba(255,255,255,0.8)',
+                      ]
+                    }}
+                    transition={{
+                      duration: 1.5,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                  >
+                    View
+                  </motion.span>
+                ) : (
+                  'View'
+                )}
+              </Button>
+            </div>
           </motion.div>
           <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -97,30 +183,77 @@ export function LandingPage() {
       </nav>
 
       {/* Section 1: Hero with Video */}
-      <Section1 videoRef={videoRef} isMuted={isMuted} setIsMuted={setIsMuted} />
+      <Section1 isMuted={isMuted} setIsMuted={setIsMuted} />
+
+      {/* Section 1.5: Sliding Features Section */}
+      <SlidingFeaturesSection />
 
       {/* Section 2: Features */}
-      <Section2 scrollYProgress={scrollYProgress} />
+      <Section2 />
 
       {/* Section 3: Technology */}
-      <Section3 scrollYProgress={scrollYProgress} />
+      <Section3 />
 
       {/* Section 4: Collaboration */}
-      <Section4 scrollYProgress={scrollYProgress} />
+      <Section4 />
 
-      {/* Section 5: Footer with About, Careers, etc. */}
-      <Section5 />
+      {/* Footer */}
+      <Footer />
     </div>
   );
 }
 
-function Section1({ videoRef, isMuted, setIsMuted }: { videoRef: React.RefObject<HTMLVideoElement>, isMuted: boolean, setIsMuted: (value: boolean) => void }) {
+function Section1({ isMuted, setIsMuted }: { isMuted: boolean, setIsMuted: (value: boolean) => void }) {
   const navigate = useNavigate();
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoSources = VIDEO_SOURCES.length > 0 ? VIDEO_SOURCES : ['/assets/hero-video.mp4'];
+  const [videoIndex, setVideoIndex] = useState(0);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) {
+      return;
+    }
+    const playPromise = video.play();
+    if (playPromise !== undefined) {
+      playPromise.catch((error) => {
+        console.log('Video autoplay prevented:', error);
+      });
+    }
+  }, [videoIndex]);
+
+  const handleVideoEnded = () => {
+    if (videoSources.length === 0) {
+      return;
+    }
+    setVideoIndex((prev) => (prev + 1) % videoSources.length);
+  };
+
+  const scrollToFeatures = () => {
+    const featuresSection = document.getElementById('features-section');
+    if (featuresSection) {
+      featuresSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
   return (
     <section className="relative h-screen flex items-center justify-center overflow-hidden">
-      {/* Subtle Dark Background */}
-      <div className="absolute inset-0 bg-[#1a1a1a]" />
+      {/* Video Background */}
+      <div className="absolute inset-0">
+        {videoSources.length > 0 && (
+          <video
+            ref={videoRef}
+            key={videoSources[videoIndex]}
+            src={videoSources[videoIndex]}
+            muted={isMuted}
+            autoPlay
+            playsInline
+            onEnded={handleVideoEnded}
+            className="h-full w-full object-cover"
+          />
+        )}
+        <div className="absolute inset-0 bg-[#1a1a1a]/70" />
+      </div>
 
       {/* Minimal Stars */}
       <div className="absolute inset-0">
@@ -190,11 +323,11 @@ function Section1({ videoRef, isMuted, setIsMuted }: { videoRef: React.RefObject
           <Button
             size="lg"
             variant="outline"
-            className="border border-white/20 text-white hover:bg-white/5 text-lg px-10 py-7"
-            onClick={() => navigate('/login')}
+            className="border border-white/20 text-gray-400 hover:text-white hover:bg-white/5 text-lg px-10 py-7"
+            onClick={scrollToFeatures}
           >
-            <Radio className="mr-2 h-5 w-5" />
-            Access System
+            <ChevronRight className="mr-2 h-5 w-5" />
+            Learn More
           </Button>
         </motion.div>
       </div>
@@ -218,19 +351,136 @@ function Section1({ videoRef, isMuted, setIsMuted }: { videoRef: React.RefObject
   );
 }
 
-function Section2({ scrollYProgress }: { scrollYProgress: any }) {
-  const opacity = useTransform(scrollYProgress, [0.1, 0.2, 0.3], [0, 1, 1]);
-  const y = useTransform(scrollYProgress, [0.1, 0.2], [100, 0]);
+function SlidingFeaturesSection() {
+  const [randomText] = useState(() => 
+    COMPLETE_PLATFORM_TEXTS[Math.floor(Math.random() * COMPLETE_PLATFORM_TEXTS.length)]
+  );
 
   const features = [
     {
-      icon: Database,
+      icon: Shield,
+      title: 'Requirements Management',
+      description: 'Track and manage system requirements with precision. Link requirements to tests, components, and documentation for complete traceability.',
+      tag: 'STRUCTURE'
+    },
+    {
+      icon: Zap,
+      title: 'Operations Management',
+      description: 'Design and visualize operational workflows with intelligent diagramming. Create process flows, decision trees, and system interactions.',
+      tag: 'WORKFLOW'
+    },
+    {
+      icon: Users,
+      title: 'Testing Management with AI Agents',
+      description: 'Leverage AI-powered testing agents to automate test generation, execution, and analysis. Verify system behavior intelligently.',
+      tag: 'AI-DRIVEN'
+    },
+  ];
+
+  return (
+    <section
+      id="features-section"
+      className="min-h-screen flex items-center justify-center py-32 bg-[#1a1a1a] overflow-hidden relative"
+    >
+      <div className="w-full px-6">
+        <div className="max-w-7xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            viewport={{ once: true }}
+            className="text-center mb-20"
+          >
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <div className="h-px w-16 bg-white/10" />
+              <span className="text-gray-500 font-mono text-xs tracking-widest uppercase">Mission-Critical Systems</span>
+              <div className="h-px w-16 bg-white/10" />
+            </div>
+            <h2 className="text-5xl md:text-7xl font-bold text-white mb-6">
+              Complete Platform
+            </h2>
+            <p className="text-xl text-gray-400 max-w-3xl mx-auto font-light">
+              End-to-end systems engineering from requirements to verification
+            </p>
+          </motion.div>
+
+          <div className="grid lg:grid-cols-2 gap-12 max-w-7xl mx-auto">
+            <div className="grid gap-8">
+              {features.map((feature, index) => (
+                <motion.div
+                  key={feature.title}
+                  initial={{ opacity: 0, x: -50 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.8, delay: index * 0.2 }}
+                  viewport={{ once: true }}
+                  whileHover={{ y: -5, scale: 1.02 }}
+                  className="relative group"
+                >
+                  <div className="absolute -top-2 -left-2 w-6 h-6 border-l border-t border-white/10 group-hover:border-white/30 transition-colors" />
+                  <div className="absolute -top-2 -right-2 w-6 h-6 border-r border-t border-white/10 group-hover:border-white/30 transition-colors" />
+                  <div className="absolute -bottom-2 -left-2 w-6 h-6 border-l border-b border-white/10 group-hover:border-white/30 transition-colors" />
+                  <div className="absolute -bottom-2 -right-2 w-6 h-6 border-r border-b border-white/10 group-hover:border-white/30 transition-colors" />
+                  
+                  <div className="relative bg-[#222222] border border-white/10 p-8 h-full overflow-hidden">
+                    <div className="absolute inset-0 opacity-[0.02]" style={{
+                      backgroundImage: `
+                        linear-gradient(rgba(255, 255, 255, 0.5) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(255, 255, 255, 0.5) 1px, transparent 1px)
+                      `,
+                      backgroundSize: '20px 20px'
+                    }} />
+                    
+                    <div className="mb-6">
+                      <span className="text-xs font-mono text-gray-500 bg-white/5 px-3 py-1.5 border border-white/10">
+                        {feature.tag}
+                      </span>
+                    </div>
+                    
+                    <div className="mb-6">
+                      <feature.icon className="h-14 w-14 text-gray-300" />
+                    </div>
+                    
+                    <h3 className="text-2xl font-bold text-white mb-4 font-mono tracking-wide">{feature.title}</h3>
+                    <p className="text-gray-400 leading-relaxed">{feature.description}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+
+            <div className="flex items-center">
+              <div className="w-full">
+                <TypeAnimation
+                  sequence={[
+                    randomText,
+                    2000
+                  ]}
+                  wrapper="p"
+                  speed={50}
+                  className="text-gray-300 font-mono text-base leading-relaxed"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Section2() {
+  const [randomText] = useState(() => 
+    EVERYTHING_YOU_NEED_TEXTS[Math.floor(Math.random() * EVERYTHING_YOU_NEED_TEXTS.length)]
+  );
+
+  const features = [
+    {
+      icon: Shield,
       title: 'RAG System for Information Retrieval',
       description: 'Intelligent document retrieval using advanced RAG technology to find the information you need instantly',
       tag: 'AI-POWERED'
     },
     {
-      icon: Bot,
+      icon: Users,
       title: 'AI Assisted Requirements and V&V Management',
       description: 'Leverage AI to manage requirements and verification & validation processes with precision and efficiency',
       tag: 'AUTONOMOUS'
@@ -238,12 +488,10 @@ function Section2({ scrollYProgress }: { scrollYProgress: any }) {
   ];
 
   return (
-    <motion.section
-      style={{ opacity, y }}
+    <section
       className="min-h-screen flex items-center justify-center px-6 py-32 bg-[#1a1a1a]"
     >
       <div className="max-w-7xl mx-auto">
-        {/* Technical Header */}
         <motion.div
           initial={{ opacity: 0, y: 50 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -264,75 +512,101 @@ function Section2({ scrollYProgress }: { scrollYProgress: any }) {
           </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-          {features.map((feature, index) => (
-            <motion.div
-              key={feature.title}
-              initial={{ opacity: 0, y: 50 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: index * 0.2 }}
-              viewport={{ once: true }}
-              whileHover={{ y: -5 }}
-              className="relative group"
-            >
-              {/* Corner Accents */}
-              <div className="absolute -top-2 -left-2 w-4 h-4 border-l border-t border-white/10 group-hover:border-white/30 transition-colors" />
-              <div className="absolute -top-2 -right-2 w-4 h-4 border-r border-t border-white/10 group-hover:border-white/30 transition-colors" />
-              <div className="absolute -bottom-2 -left-2 w-4 h-4 border-l border-b border-white/10 group-hover:border-white/30 transition-colors" />
-              <div className="absolute -bottom-2 -right-2 w-4 h-4 border-r border-b border-white/10 group-hover:border-white/30 transition-colors" />
-              
-              <div className="relative bg-[#222222] border border-white/10 p-10 overflow-hidden">
-                {/* Subtle Grid */}
-                <div className="absolute inset-0 opacity-[0.02]" style={{
-                  backgroundImage: `
-                    linear-gradient(rgba(255, 255, 255, 0.5) 1px, transparent 1px),
-                    linear-gradient(90deg, rgba(255, 255, 255, 0.5) 1px, transparent 1px)
-                  `,
-                  backgroundSize: '20px 20px'
-                }} />
+        <div className="grid lg:grid-cols-2 gap-12 max-w-7xl mx-auto">
+          <div className="grid gap-8">
+            {features.map((feature, index) => (
+              <motion.div
+                key={feature.title}
+                initial={{ opacity: 0, y: 50 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: index * 0.2 }}
+                viewport={{ once: true }}
+                whileHover={{ y: -5 }}
+                className="relative group"
+              >
+                <div className="absolute -top-2 -left-2 w-4 h-4 border-l border-t border-white/10 group-hover:border-white/30 transition-colors" />
+                <div className="absolute -top-2 -right-2 w-4 h-4 border-r border-t border-white/10 group-hover:border-white/30 transition-colors" />
+                <div className="absolute -bottom-2 -left-2 w-4 h-4 border-l border-b border-white/10 group-hover:border-white/30 transition-colors" />
+                <div className="absolute -bottom-2 -right-2 w-4 h-4 border-r border-b border-white/10 group-hover:border-white/30 transition-colors" />
                 
-                {/* Tag */}
-                <div className="mb-4">
-                  <span className="text-xs font-mono text-gray-500 bg-white/5 px-3 py-1 border border-white/10">
-                    {feature.tag}
-                  </span>
+                <div className="relative bg-[#222222] border border-white/10 p-10 overflow-hidden">
+                  <div className="absolute inset-0 opacity-[0.02]" style={{
+                    backgroundImage: `
+                      linear-gradient(rgba(255, 255, 255, 0.5) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(255, 255, 255, 0.5) 1px, transparent 1px)
+                    `,
+                    backgroundSize: '20px 20px'
+                  }} />
+                  
+                  <div className="mb-4">
+                    <span className="text-xs font-mono text-gray-500 bg-white/5 px-3 py-1 border border-white/10">
+                      {feature.tag}
+                    </span>
+                  </div>
+                  
+                  <div className="mb-6">
+                    <feature.icon className="h-12 w-12 text-gray-300" />
+                  </div>
+                  
+                  <h3 className="text-2xl font-bold text-white mb-4">{feature.title}</h3>
+                  <p className="text-gray-400 leading-relaxed">{feature.description}</p>
                 </div>
-                
-                {/* Icon */}
-                <div className="mb-6">
-                  <feature.icon className="h-12 w-12 text-gray-300" />
-                </div>
-                
-                <h3 className="text-2xl font-bold text-white mb-4">{feature.title}</h3>
-                <p className="text-gray-400 leading-relaxed">{feature.description}</p>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            ))}
+          </div>
+
+          <div className="flex items-center">
+            <div className="w-full">
+              <TypeAnimation
+                sequence={[
+                  randomText,
+                  2000
+                ]}
+                wrapper="p"
+                speed={50}
+                className="text-gray-300 font-mono text-base leading-relaxed"
+              />
+            </div>
+          </div>
         </div>
       </div>
-    </motion.section>
+    </section>
   );
 }
 
-function Section3({ scrollYProgress }: { scrollYProgress: any }) {
-  const opacity = useTransform(scrollYProgress, [0.3, 0.4, 0.5], [0, 1, 1]);
-  const y = useTransform(scrollYProgress, [0.3, 0.4], [100, 0]);
+function Section3() {
+  const [randomText] = useState(() => 
+    INTEGRATIONS_TEXTS[Math.floor(Math.random() * INTEGRATIONS_TEXTS.length)]
+  );
 
   const integrations = [
-    { logo: capellaLogo, name: 'Capella' },
-    { logo: mslLogo, name: 'MSL v2' },
-    { logo: googleSheetsLogo, name: 'Google Sheets' },
-    { logo: diagramGptLogo, name: 'DiagramGPT' },
-    { logo: githubLogo, name: 'GitHub' },
+    { 
+      logo: capellaLogo, 
+      name: 'Capella',
+      description: 'Systems architecture modeling with automated requirement synthesis and design validation workflows'
+    },
+    { 
+      logo: mslLogo, 
+      name: 'MSL',
+      description: 'Mission systems library integration for standardized component catalogs and heritage design patterns'
+    },
+    { 
+      logo: githubLogo, 
+      name: 'GitHub',
+      description: 'Version control synchronization with automated change tracking and collaborative design review pipelines'
+    },
+    { 
+      logo: diagramGPTLogo, 
+      name: 'DiagramGPT',
+      description: 'AI-powered diagram generation from natural language specifications and automatic visual documentation'
+    },
   ];
 
   return (
-    <motion.section
-      style={{ opacity, y }}
+    <section
       className="min-h-screen flex items-center justify-center px-6 py-32 bg-[#1a1a1a]"
     >
       <div className="max-w-7xl mx-auto">
-        {/* Technical Header */}
         <motion.div
           initial={{ opacity: 0, y: 50 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -353,49 +627,58 @@ function Section3({ scrollYProgress }: { scrollYProgress: any }) {
           </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+        <div className="grid md:grid-cols-4 gap-6 max-w-6xl mx-auto mb-16">
           {integrations.map((integration, index) => (
             <motion.div
               key={integration.name}
-              initial={{ opacity: 0, y: 50 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: index * 0.2 }}
+              initial={{ opacity: 0, scale: 0.8 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.6, delay: index * 0.1 }}
               viewport={{ once: true }}
               whileHover={{ y: -10 }}
               className="relative group"
             >
-              {/* Corner Indicators */}
               <div className="absolute -top-1 -left-1 w-3 h-3 border-l border-t border-white/10 group-hover:border-white/20 transition-colors" />
               <div className="absolute -top-1 -right-1 w-3 h-3 border-r border-t border-white/10 group-hover:border-white/20 transition-colors" />
               <div className="absolute -bottom-1 -left-1 w-3 h-3 border-l border-b border-white/10 group-hover:border-white/20 transition-colors" />
               <div className="absolute -bottom-1 -right-1 w-3 h-3 border-r border-b border-white/10 group-hover:border-white/20 transition-colors" />
               
-              <div className="bg-white p-12 transition-all duration-300 flex items-center justify-center relative overflow-hidden">
+              <div className="bg-white p-8 transition-all duration-300 flex flex-col items-center justify-center relative overflow-hidden min-h-[180px]">
                 <img 
                   src={integration.logo} 
                   alt={integration.name}
-                  className="w-full h-auto max-h-24 object-contain relative z-10"
+                  className="w-full h-auto max-h-16 object-contain relative z-10 mb-3"
                 />
+                <p className="text-xs text-gray-600 text-center font-mono leading-tight">
+                  {integration.description}
+                </p>
               </div>
             </motion.div>
           ))}
         </div>
+
+        <div className="max-w-4xl mx-auto mt-20">
+          <TypeAnimation
+            sequence={[
+              randomText,
+              2000
+            ]}
+            wrapper="p"
+            speed={50}
+            className="text-gray-300 font-mono text-base leading-relaxed text-center"
+          />
+        </div>
       </div>
-    </motion.section>
+    </section>
   );
 }
 
-function Section4({ scrollYProgress }: { scrollYProgress: any }) {
-  const opacity = useTransform(scrollYProgress, [0.5, 0.6, 0.7], [0, 1, 1]);
-  const y = useTransform(scrollYProgress, [0.5, 0.6], [100, 0]);
-
+function Section4() {
   return (
-    <motion.section
-      style={{ opacity, y }}
+    <section
       className="min-h-screen flex items-center justify-center px-6 py-32 bg-[#1a1a1a]"
     >
       <div className="max-w-7xl mx-auto text-center">
-        {/* Technical Header */}
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           whileInView={{ opacity: 1, scale: 1 }}
@@ -421,7 +704,6 @@ function Section4({ scrollYProgress }: { scrollYProgress: any }) {
           className="flex items-center justify-center mb-20"
         >
           <div className="relative group">
-            {/* Corner Indicators */}
             <div className="absolute -top-2 -left-2 w-6 h-6 border-l border-t border-white/10 group-hover:border-white/20 transition-colors" />
             <div className="absolute -top-2 -right-2 w-6 h-6 border-r border-t border-white/10 group-hover:border-white/20 transition-colors" />
             <div className="absolute -bottom-2 -left-2 w-6 h-6 border-l border-b border-white/10 group-hover:border-white/20 transition-colors" />
@@ -429,8 +711,8 @@ function Section4({ scrollYProgress }: { scrollYProgress: any }) {
             
             <div className="bg-white p-16 transition-all duration-300 relative overflow-hidden">
               <img 
-                src={spaceConcordiaLogo} 
-                alt="Space Concordia"
+                src={capellaLogo} 
+                alt="Capella"
                 className="w-64 h-auto object-contain relative z-10"
               />
             </div>
@@ -451,135 +733,6 @@ function Section4({ scrollYProgress }: { scrollYProgress: any }) {
             <Target className="mr-2 h-5 w-5" />
             Join Our Community
           </Button>
-        </motion.div>
-      </div>
-    </motion.section>
-  );
-}
-
-function Section5() {
-  const navigate = useNavigate();
-
-  const footerLinks = {
-    product: [
-      { name: 'Features', href: '#' },
-      { name: 'Pricing', href: '#' },
-    ],
-    company: [
-      { name: 'About Us', href: '#' },
-      { name: 'Blog', href: '#' },
-    ],
-    resources: [
-      { name: 'Documentation', href: '#' },
-      { name: 'Help Center', href: '#' },
-      { name: 'Community', href: '#' },
-      { name: 'Contact', href: '#' },
-    ],
-  };
-
-  return (
-    <section className="bg-black border-t border-white/10 px-6 py-20">
-      <div className="max-w-7xl mx-auto">
-        <div className="grid md:grid-cols-4 gap-12 mb-16">
-          {/* Brand Column */}
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            viewport={{ once: true }}
-            className="md:col-span-1"
-          >
-            <div className="flex items-center gap-2 mb-4">
-              <Satellite className="h-8 w-8 text-cyan-400" />
-              <span className="text-xl font-bold text-white font-mono">nanoSatView systems</span>
-            </div>
-            <p className="text-gray-400 mb-6">
-              Building the future of systems engineering.
-            </p>
-            <div className="flex items-center gap-4">
-              <a href="#" className="text-gray-400 hover:text-cyan-400 transition-colors">
-                <Twitter className="h-5 w-5" />
-              </a>
-              <a href="#" className="text-gray-400 hover:text-cyan-400 transition-colors">
-                <Linkedin className="h-5 w-5" />
-              </a>
-              <a href="#" className="text-gray-400 hover:text-cyan-400 transition-colors">
-                <Github className="h-5 w-5" />
-              </a>
-            </div>
-          </motion.div>
-
-          {/* Links Columns */}
-          {Object.entries(footerLinks).map(([category, links], index) => (
-            <motion.div
-              key={category}
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: index * 0.1 }}
-              viewport={{ once: true }}
-            >
-              <h3 className="text-white font-semibold mb-4 capitalize">{category}</h3>
-              <ul className="space-y-3">
-                {links.map((link) => (
-                  <li key={link.name}>
-                    <a
-                      href={link.href}
-                      className="text-gray-400 hover:text-white transition-colors"
-                    >
-                      {link.name}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* Newsletter */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          viewport={{ once: true }}
-          className="border-t border-white/10 pt-12 mb-12"
-        >
-          <div className="max-w-xl mx-auto text-center">
-            <h3 className="text-2xl font-bold text-white mb-4">Stay Updated</h3>
-            <p className="text-gray-400 mb-6">
-              Get the latest updates, insights, and news delivered to your inbox.
-            </p>
-            <div className="flex gap-2">
-              <input
-                type="email"
-                placeholder="Enter your email"
-                className="flex-1 px-4 py-3 bg-slate-900 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
-              />
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white px-6">
-                Subscribe
-              </Button>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Bottom Bar */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          transition={{ duration: 0.6 }}
-          viewport={{ once: true }}
-          className="border-t border-white/10 pt-8 flex flex-col md:flex-row items-center justify-between gap-4"
-        >
-          <p className="text-gray-400 text-sm">
-            © 2026 nanoSatView systems. All rights reserved.
-          </p>
-          <div className="flex items-center gap-6">
-            <a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">
-              Privacy
-            </a>
-            <a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">
-              Terms
-            </a>
-          </div>
         </motion.div>
       </div>
     </section>

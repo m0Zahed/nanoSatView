@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Settings, LogOut, Check, X, Link2 } from 'lucide-react';
+import { useNavigate } from 'react-router';
+import { Settings, LogOut, Check, X, Link2, PanelLeftClose, PanelLeft, Book } from 'lucide-react';
 import { OrganizationSidebar } from '@/app/components/OrganizationSidebar';
 import { ProjectSidebar } from '@/app/components/ProjectSidebar';
 import { OrganizationView } from '@/app/components/OrganizationView';
@@ -9,7 +9,9 @@ import { OrganizationSettings } from '@/app/components/OrganizationSettings';
 import { RequirementsView } from '@/app/components/RequirementsView';
 import { TimelineView } from '@/app/components/TimelineView';
 import { ComponentsView } from '@/app/components/ComponentsView';
+import { MembersView } from '@/app/components/MembersView';
 import { UserSettings } from '@/app/components/UserSettings';
+import { ViewPage } from '@/app/components/ViewPage';
 import { Button } from '@/app/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
 import { Input } from '@/app/components/ui/input';
@@ -18,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/ta
 import { Alert, AlertDescription } from '@/app/components/ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/app/components/ui/tooltip';
 import { ProjectMembersDialog } from '@/app/components/ProjectMembersDialog';
+import { useAuth } from '@/app/auth/AuthContext';
 
 interface Organization {
   id: string;
@@ -64,6 +67,7 @@ interface OrgJoinRequest {
 
 export function Dashboard() {
   const navigate = useNavigate();
+  const { signOut } = useAuth();
   const [organizations, setOrganizations] = useState<Organization[]>([
     { id: '2', name: 'Personal Projects', initials: 'PP', color: 'bg-green-500', inviteLink: 'personal-xyz789' },
   ]);
@@ -84,9 +88,11 @@ export function Dashboard() {
   const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false);
   const [selectedProjectForMember, setSelectedProjectForMember] = useState<string | null>(null);
   const [newMemberEmail, setNewMemberEmail] = useState('');
-  const [currentView, setCurrentView] = useState<'project' | 'requirements' | 'timeline' | 'components'>('project');
+  const [currentView, setCurrentView] = useState<'project' | 'requirements' | 'timeline' | 'components' | 'members'>('project');
   const [activeProjectTab, setActiveProjectTab] = useState<string>('overview');
   const [isUserSettingsOpen, setIsUserSettingsOpen] = useState(false);
+  const [isProjectSidebarVisible, setIsProjectSidebarVisible] = useState(true);
+  const [currentPage, setCurrentPage] = useState<'dashboard' | 'systems' | 'view'>('dashboard');
 
   // Mock members and org join requests
   const [members] = useState<Member[]>([
@@ -95,8 +101,8 @@ export function Dashboard() {
   ]);
   const [orgJoinRequests, setOrgJoinRequests] = useState<OrgJoinRequest[]>([]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated');
+  const handleLogout = async () => {
+    await signOut();
     navigate('/');
   };
 
@@ -218,6 +224,12 @@ export function Dashboard() {
   const handleOpenAddMember = (projectId: string) => {
     setSelectedProjectForMember(projectId);
     setIsAddMemberDialogOpen(true);
+  };
+
+  const handleViewMembers = (projectId: string) => {
+    setSelectedProjectId(projectId);
+    setSelectedProjectForMember(projectId);
+    setCurrentView('members');
   };
 
   const handleAddMemberToProject = (memberId: string) => {
@@ -430,7 +442,7 @@ export function Dashboard() {
       />
 
       {/* Project Sidebar */}
-      {selectedOrg && (
+      {selectedOrg && isProjectSidebarVisible && (
         <ProjectSidebar
           organizationName={selectedOrg.name}
           projects={currentProjects}
@@ -444,6 +456,7 @@ export function Dashboard() {
           onDeleteProject={handleDeleteProject}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onAddMember={handleOpenAddMember}
+          onViewMembers={handleViewMembers}
           onAddRequirements={handleOpenAddRequirements}
           onAddTimeline={handleOpenAddTimeline}
           onOpenOperationalFlow={handleOpenOperationalFlow}
@@ -464,6 +477,29 @@ export function Dashboard() {
           />
           
           <div className="flex items-center gap-2 relative z-10">
+            {selectedOrg && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsProjectSidebarVisible(!isProjectSidebarVisible)}
+                      className="gap-2 text-gray-400 hover:text-white hover:bg-white/5 font-mono rounded-none"
+                    >
+                      {isProjectSidebarVisible ? (
+                        <PanelLeftClose className="h-4 w-4" />
+                      ) : (
+                        <PanelLeft className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="bg-[#1a1a1a] border-white/10 text-white font-mono">
+                    <p>{isProjectSidebarVisible ? 'Hide Sidebar' : 'Show Sidebar'}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
             {joinRequests.length > 0 && (
               <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-400/10 border border-amber-400/20 rounded-none">
                 <span className="relative flex h-2 w-2">
@@ -477,6 +513,15 @@ export function Dashboard() {
             )}
           </div>
           <div className="flex items-center gap-2 relative z-10">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/documentation')}
+              className="gap-2 text-gray-400 hover:text-white hover:bg-white/5 font-mono rounded-none"
+            >
+              <Book className="h-4 w-4" />
+              Docs
+            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -519,6 +564,14 @@ export function Dashboard() {
               components={selectedProject.components || []}
               onAddComponent={handleAddComponentInView}
               onRemoveComponent={handleRemoveComponent}
+            />
+          ) : currentView === 'members' && selectedProject ? (
+            <MembersView
+              projectName={selectedProject.name}
+              members={selectedProject.members || []}
+              availableMembers={members}
+              onAddMember={handleAddMemberToProject}
+              onRemoveMember={handleRemoveMemberFromProject}
             />
           ) : (
             <OrganizationView 

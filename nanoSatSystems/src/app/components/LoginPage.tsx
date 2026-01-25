@@ -1,34 +1,62 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Separator } from '@/app/components/ui/separator';
+import { postJson } from '@/app/auth/api';
+import { useAuth, type User } from '@/app/auth/AuthContext';
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const { setUser } = useAuth();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Mock login - just navigate to dashboard
-    localStorage.setItem('isAuthenticated', 'true');
-    navigate('/dashboard');
+    setErrorMessage(null);
+    setIsSubmitting(true);
+    try {
+      const { status, data } = await postJson('/auth/login', { email, password });
+      if (status === 200 && data && typeof data === 'object' && 'user' in data) {
+        setUser((data as { user: User }).user);
+        navigate('/dashboard');
+        return;
+      }
+
+      if (status === 401 || status === 403) {
+        const message =
+          data && typeof data === 'object' && 'error' in data
+            ? ((data as { error: { message?: string } }).error?.message ?? 'Login failed.')
+            : 'Login failed.';
+        setErrorMessage(message);
+        return;
+      }
+
+      setErrorMessage('Login failed. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleGoogleLogin = () => {
-    // Mock Google login - in a real app, this would initiate OAuth flow
-    localStorage.setItem('isAuthenticated', 'true');
-    localStorage.setItem('loginMethod', 'google');
-    navigate('/dashboard');
+    window.location.href = 'http://localhost:5000/auth/google/start';
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
+          <div className="flex justify-center">
+            <Link to="/" className="text-xl font-bold text-primary tracking-wider">
+              nanoSat
+            </Link>
+          </div>
           <CardTitle className="text-2xl">Welcome back</CardTitle>
           <CardDescription>
             Enter your credentials to access your dashboard
@@ -98,8 +126,20 @@ export function LoginPage() {
                   required
                 />
               </div>
-              <Button type="submit" className="w-full">
-                Sign In
+              {location.state && (location.state as { resetSuccess?: boolean }).resetSuccess && (
+                <p className="text-sm text-green-500">Password reset successful. Please sign in.</p>
+              )}
+              {errorMessage && <p className="text-sm text-red-500">{errorMessage}</p>}
+              <div className="flex items-center justify-between text-sm">
+                <Link to="/forgot-password" className="text-muted-foreground hover:underline">
+                  Forgot password?
+                </Link>
+                <Link to="/dashboard" className="text-muted-foreground hover:underline">
+                  Back to dashboard
+                </Link>
+              </div>
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? 'Signing In...' : 'Sign In'}
               </Button>
             </form>
 

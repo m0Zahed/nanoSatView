@@ -1,4 +1,6 @@
-export const API_BASE_URL = 'http://localhost:5000';
+export const API_BASE_URL =
+  (import.meta.env.VITE_AUTH_BASE_URL as string | undefined)?.replace(/\/+$/, '') ||
+  'http://localhost:5000';
 
 export type User = {
   id: string;

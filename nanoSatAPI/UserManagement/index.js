@@ -12,16 +12,43 @@ const crypto = require('crypto');
 const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 5000;
 const APP_VERSION = process.env.APP_VERSION || 'unknown';
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
-const VERIFY_PAGE_URL = process.env.VERIFY_PAGE_URL || 'http://localhost:5173/verify-email';
-const RESET_PAGE_URL = process.env.RESET_PAGE_URL || 'http://localhost:5173/reset-password';
+// Normalize URLs so we don't end up with double slashes in redirects/CORS
+const rawOrigins = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+const CLIENT_ORIGINS = rawOrigins
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean)
+  .map((o) => o.replace(/\/+$/, ''));
+const CLIENT_ORIGIN = CLIENT_ORIGINS[0] || 'http://localhost:5173';
+const VERIFY_PAGE_URL = (process.env.VERIFY_PAGE_URL || 'http://localhost:5173/verify-email').replace(/\/+$/, '');
+const RESET_PAGE_URL = (process.env.RESET_PAGE_URL || 'http://localhost:5173/reset-password').replace(/\/+$/, '');
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5000/auth/google/callback';
 const SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7;
 const ADMIN_EMAIL = 'zahedmohammedwork@gmail.com';
 
-app.use(cors({ origin: CLIENT_ORIGIN, credentials: true }));
+const allowedOrigins = new Set(
+  CLIENT_ORIGINS.flatMap((o) => [o, `${o}/`])
+);
+
+app.use(
+  cors({
+    credentials: true,
+  origin: (requestOrigin, callback) => {
+    // Allow same-origin requests (e.g., curl, mobile) with no Origin header
+    if (!requestOrigin) return callback(null, true);
+
+    const normalized = requestOrigin.replace(/\/+$/, '');
+    if (allowedOrigins.has(normalized)) {
+      // mirror the exact origin back so the browser accepts it with credentials
+      return callback(null, true);
+    }
+    console.warn('[cors] blocked origin', requestOrigin);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  })
+);
 app.use(express.json());
 app.use(cookieParser());
 

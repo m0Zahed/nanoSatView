@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Settings, LogOut, Check, X, Link2, PanelLeftClose, PanelLeft, Book } from 'lucide-react';
 import { OrganizationSidebar } from '@/app/components/OrganizationSidebar';
@@ -21,6 +21,15 @@ import { Alert, AlertDescription } from '@/app/components/ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/app/components/ui/tooltip';
 import { ProjectMembersDialog } from '@/app/components/ProjectMembersDialog';
 import { useAuth } from '@/app/auth/AuthContext';
+import {
+  createProject as apiCreateProject,
+  deleteProject as apiDeleteProject,
+  fetchProjects,
+  joinProject as apiJoinProject,
+  fetchOrganizationsWithProjects,
+  Project as ApiProject,
+  OrganizationProjects as ApiOrganizationProjects,
+} from '@/app/api/projects';
 
 interface Organization {
   id: string;
@@ -36,6 +45,7 @@ interface Project {
   description: string;
   createdAt: Date;
   organizationId: string;
+  personalProject?: boolean;
   members?: Member[];
   requirements?: string[];
   timeline?: string;
@@ -67,11 +77,11 @@ interface OrgJoinRequest {
 
 export function Dashboard() {
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const [organizations, setOrganizations] = useState<Organization[]>([
-    { id: '2', name: 'Personal Projects', initials: 'PP', color: 'bg-green-500', inviteLink: 'personal-xyz789' },
+    { id: 'personal', name: 'Personal Projects', initials: 'PP', color: 'bg-green-500', inviteLink: 'personal-xyz789' },
   ]);
-  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
+  const [selectedOrgId, setSelectedOrgId] = useState<string | null>('personal');
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [isOrgDialogOpen, setIsOrgDialogOpen] = useState(false);
@@ -93,6 +103,7 @@ export function Dashboard() {
   const [isUserSettingsOpen, setIsUserSettingsOpen] = useState(false);
   const [isProjectSidebarVisible, setIsProjectSidebarVisible] = useState(true);
   const [currentPage, setCurrentPage] = useState<'dashboard' | 'systems' | 'view'>('dashboard');
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
 
   // Mock members and org join requests
   const [members] = useState<Member[]>([
@@ -105,6 +116,83 @@ export function Dashboard() {
     await signOut();
     navigate('/');
   };
+
+  // Load projects from API
+  useEffect(() => {
+    const load = async () => {
+      setIsLoadingProjects(true);
+      const userId = currentUserId;
+      if (userId) {
+        const { status, data } = await fetchOrganizationsWithProjects(userId);
+        if (status === 200 && Array.isArray(data)) {
+          const orgProjects = data as ApiOrganizationProjects[];
+
+          const mappedProjects: Project[] = orgProjects.flatMap((op) =>
+            op.projects.map((p) => ({
+              id: p.id,
+              name: p.name,
+              description: p.description,
+              createdAt: new Date(p.createdAt),
+              organizationId: p.organizationId || op.organizationId || 'personal',
+              personalProject: p.personalProject || (p.organizationId || op.organizationId) === 'personal',
+              members: members,
+              requirements: p.requirementsListId ? [p.requirementsListId] : [],
+              timeline: p.timelineId || '',
+              components: p.componentsListId ? [p.componentsListId] : [],
+            }))
+          );
+
+          const mappedOrganizations: Organization[] = orgProjects.map((op) => {
+            const orgId = op.organizationId || 'personal';
+            const name = orgId === 'personal' ? 'Personal Projects' : `Organization ${orgId}`;
+            const initials = name
+              .split(' ')
+              .map((w) => w[0])
+              .join('')
+              .toUpperCase()
+              .slice(0, 2);
+            return {
+              id: orgId,
+              name,
+              initials,
+              color: 'bg-indigo-500',
+            };
+          });
+
+          setOrganizations(mappedOrganizations.length > 0 ? mappedOrganizations : organizations);
+          setProjects(mappedProjects);
+          if (!selectedOrgId && mappedOrganizations.length > 0) {
+            setSelectedOrgId(mappedOrganizations[0].id);
+          }
+        } else {
+          // fallback to existing fetch if new endpoint fails
+          const { status: fallbackStatus, data: fallbackData } = await fetchProjects();
+          if (fallbackStatus === 200 && Array.isArray(fallbackData)) {
+            const mapped: Project[] = (fallbackData as ApiProject[]).map((p) => ({
+              id: p.id,
+              name: p.name,
+              description: p.description,
+              createdAt: new Date(p.createdAt),
+              organizationId: p.organizationId || 'personal',
+              personalProject: p.personalProject || p.organizationId === 'personal',
+              members: members,
+              requirements: p.requirementsListId ? [p.requirementsListId] : [],
+              timeline: p.timelineId || '',
+              components: p.componentsListId ? [p.componentsListId] : [],
+            }));
+            setProjects(mapped);
+          }
+        }
+      }
+      setIsLoadingProjects(false);
+    };
+    if (user) {
+      load();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  const currentUserId = useMemo(() => user?.id ?? user?.email ?? 'me', [user]);
 
   const handleCreateOrganization = () => {
     if (!newOrgName.trim()) return;
@@ -155,19 +243,32 @@ export function Dashboard() {
     }
   };
 
-  const handleJoinViaLink = () => {
-    if (!inviteLink.trim()) return;
+  const handleJoinViaLink = async () => {
+    const token = inviteLink.trim();
+    if (!token) return;
 
-    const org = organizations.find((org) => org.inviteLink === inviteLink);
-
-    if (org) {
-      setSelectedOrgId(org.id);
+    const { status, data } = await apiJoinProject(token, currentUserId);
+    if (status === 200 && data && typeof data === 'object' && 'id' in data) {
+      const projData = data as ApiProject;
+      const mapped: Project = {
+        id: projData.id,
+        name: projData.name,
+        description: projData.description,
+        createdAt: new Date(projData.createdAt),
+        organizationId: projData.organizationId || selectedOrgId || 'personal',
+        personalProject: projData.personalProject || projData.organizationId === 'personal',
+        members: members,
+      };
+      setProjects((prev) => {
+        const exists = prev.find((p) => p.id === mapped.id);
+        return exists ? prev.map((p) => (p.id === mapped.id ? mapped : p)) : [...prev, mapped];
+      });
       setInviteLink('');
       setIsOrgDialogOpen(false);
-      setAlertMessage(`Successfully joined "${org.name}"!`);
+      setAlertMessage(`Joined project "${projData.name}".`);
       setShowSuccessAlert(true);
     } else {
-      setAlertMessage('Invalid invite link. Please check and try again.');
+      setAlertMessage('Invalid or expired invite link.');
       setShowSuccessAlert(true);
     }
   };
@@ -176,31 +277,61 @@ export function Dashboard() {
     setJoinRequests(joinRequests.filter((req) => req.id !== requestId));
   };
 
-  const handleCreateProject = () => {
-    if (!newProjectName.trim() || !selectedOrgId) return;
+  const handleCreateProject = async () => {
+    if (!newProjectName.trim()) return;
 
-    const newProject: Project = {
-      id: Date.now().toString(),
-      name: newProjectName,
-      description: newProjectDescription,
-      createdAt: new Date(),
-      organizationId: selectedOrgId,
-      members: members,
+    const payload = {
+      name: newProjectName.trim(),
+      description: newProjectDescription.trim(),
+      owner: currentUserId,
+      isPublic: false,
+      organizationId: selectedOrgId ?? 'personal',
+      personalProject: (selectedOrgId ?? 'personal') === 'personal',
+      requirementsListId: '',
+      componentsListId: '',
+      timelineId: '',
+      integrationsId: '',
+      documentIds: [],
+      memberIds: [currentUserId],
     };
 
-    setProjects([...projects, newProject]);
-    setSelectedProjectId(newProject.id);
-    setNewProjectName('');
-    setNewProjectDescription('');
-    setIsProjectDialogOpen(false);
-    setAlertMessage(`Project "${newProjectName}" created successfully!`);
-    setShowSuccessAlert(true);
+    const { status, data } = await apiCreateProject(payload);
+    if (status === 201 && data && typeof data === 'object' && 'id' in data) {
+      const projData = data as ApiProject;
+      const newProject: Project = {
+        id: projData.id,
+        name: projData.name,
+        description: projData.description,
+        createdAt: new Date(projData.createdAt),
+        organizationId: projData.organizationId || selectedOrgId || 'personal',
+        personalProject: projData.personalProject || projData.organizationId === 'personal',
+        members: members,
+      };
+
+      setProjects([...projects, newProject]);
+      setSelectedProjectId(newProject.id);
+      setNewProjectName('');
+      setNewProjectDescription('');
+      setIsProjectDialogOpen(false);
+      setAlertMessage(`Project "${newProjectName}" created successfully!`);
+      setShowSuccessAlert(true);
+    } else {
+      setAlertMessage('Failed to create project.');
+      setShowSuccessAlert(true);
+    }
   };
 
-  const handleDeleteProject = (projectId: string) => {
+  const handleDeleteProject = async (projectId: string) => {
+    const prev = projects;
     setProjects(projects.filter((p) => p.id !== projectId));
     if (selectedProjectId === projectId) {
       setSelectedProjectId(null);
+    }
+    const { status } = await apiDeleteProject(projectId);
+    if (status !== 204) {
+      setProjects(prev);
+      setAlertMessage('Failed to delete project.');
+      setShowSuccessAlert(true);
     }
   };
 

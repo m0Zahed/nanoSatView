@@ -17,8 +17,8 @@ class TypesenseClientSingleton {
     return new Client({
       nodes: [
         {
-          host: 'localhost',
-          port: 8200,
+          host: 'nanosatview.com',
+          port: 80,
           protocol: 'http',
         },
       ],

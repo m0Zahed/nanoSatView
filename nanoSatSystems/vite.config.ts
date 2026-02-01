@@ -16,4 +16,10 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    allowedHosts: ['nanosatview.com', 'www.nanosatview.com', '54.234.130.176'],
+  },
+  preview: {
+    allowedHosts: ['nanosatview.com', 'www.nanosatview.com', '54.234.130.176'],
+  },
 })

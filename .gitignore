@@ -57,6 +57,12 @@ typesense-data/
 typesense_server/meta/
 typesense_server/db/
 typesense_server/state/
+typesense_server_backup/
+
+### Nginx TLS/ACME artifacts
+assets/nginx/certs/
+assets/nginx/letsencrypt/
+assets/nginx/webroot/.well-known/acme-challenge/
 
 ### SQLite
 *.db

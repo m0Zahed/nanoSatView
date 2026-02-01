@@ -62,7 +62,7 @@ export function SignUpPage() {
   };
 
   const handleGoogleSignUp = () => {
-    window.location.href = 'http://localhost:5000/auth/google/start';
+    window.location.href = '/api/auth/google/start';
   };
 
   const handlePictureChange = (event: React.ChangeEvent<HTMLInputElement>) => {

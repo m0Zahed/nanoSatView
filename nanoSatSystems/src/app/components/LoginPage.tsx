@@ -45,7 +45,7 @@ export function LoginPage() {
   };
 
   const handleGoogleLogin = () => {
-    window.location.href = 'http://localhost:5000/auth/google/start';
+    window.location.href = '/api/auth/google/start';
   };
 
   return (

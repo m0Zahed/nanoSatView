@@ -54,6 +54,7 @@ coverage/
 
 ### Typesense data
 typesense-data/
+typesense_server/
 typesense_server/meta/
 typesense_server/db/
 typesense_server/state/

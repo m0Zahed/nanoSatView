@@ -91,7 +91,7 @@ export function ComponentsView({
       <div className="w-72 border-r border-white/10 flex flex-col">
         <div className="px-5 py-4 border-b border-white/10">
           <p className="text-xs text-gray-400 font-mono">Components Panel</p>
-          <h2 className="text-lg font-serif">SYSTEM OVERVIEW</h2>
+          <h2 className="text-lg font-serif">Components</h2>
           <p className="text-xs text-gray-400 font-mono mt-2">{projectName}</p>
         </div>
         <ScrollArea className="flex-1">
@@ -304,7 +304,7 @@ export function ComponentsView({
 
       <div className="flex-1 flex flex-col">
         <div className="px-6 py-4 border-b border-white/10">
-          <h1 className="text-xl font-serif">SYSTEM OVERVIEW</h1>
+          <h1 className="text-xl font-serif">Components</h1>
           <p className="text-xs text-gray-400 font-mono mt-2">
             A multi-pane web application for systems engineering documentation, requirements management,
             and AI-assisted document generation and verification.

@@ -5,6 +5,12 @@ import { Satellite, ChevronRight, Zap, Shield, Users, Target, ChevronDown } from
 import { Button } from '@/app/components/ui/button';
 import { TypeAnimation } from 'react-type-animation';
 import { Footer } from '@/app/components/Footer';
+import capellaLogo from '@/assets/4cd63406e6ab2d332d6361418a9c6bf4fb53dca0.png';
+import githubLogo from '@/assets/d7c9b449ae05744848c56899970eefd75390854e.png';
+import diagramGPTLogo from '@/assets/5234ef8dd429a3869ddae4436a895d1252b4570a.png';
+import googleDocsLogo from '@/assets/google-docs.svg';
+import googleSheetsLogo from '@/assets/google-sheets.svg';
+import googleChatLogo from '@/assets/google-chat.svg';
 
 // Pre-generated text descriptions for random selection
 const COMPLETE_PLATFORM_TEXTS = [
@@ -12,7 +18,11 @@ const COMPLETE_PLATFORM_TEXTS = [
 ];
 
 const EVERYTHING_YOU_NEED_TEXTS = [
-  "Semantic vector embeddings enable context-aware document retrieval across terabytes of technical documentation. Query using natural language and receive ranked results based on conceptual similarity."
+  "Semantic vector embeddings enable context-aware document retrieval across gigabytes of technical documentation. Query using natural language and receive ranked results based on conceptual similarity."
+];
+
+const INTEGRATIONS_TEXTS = [
+  "Integrations across several platforms.",
 ];
 
 const VIDEO_SOURCES = Object.values(
@@ -173,6 +183,9 @@ export function LandingPage() {
 
       {/* Section 2: Features */}
       <Section2 />
+
+      {/* Section 3: Integrations */}
+      <Section3 />
 
       {/* Footer */}
       <Footer />
@@ -545,6 +558,115 @@ function Section2() {
               />
             </div>
           </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Section3() {
+  const [randomText] = useState(() => 
+    INTEGRATIONS_TEXTS[Math.floor(Math.random() * INTEGRATIONS_TEXTS.length)]
+  );
+
+  const integrations = [
+    { 
+      logo: capellaLogo, 
+      name: 'Capella',
+      description: 'Satellite imagery and analytics'
+    },
+    { 
+      logo: diagramGPTLogo, 
+      name: 'DiagramGPT',
+      description: 'AI-powered diagram generation'
+    },
+    { 
+      logo: googleChatLogo, 
+      name: 'Google Chat',
+      description: 'Team messaging and collaboration'
+    },
+    { 
+      logo: googleDocsLogo, 
+      name: 'Google Docs',
+      description: 'Documentation workflows and exports'
+    },
+    { 
+      logo: googleSheetsLogo, 
+      name: 'Google Sheets',
+      description: 'Requirements tracking and reporting'
+    },
+    { 
+      logo: githubLogo, 
+      name: 'GitHub',
+      description: 'Version control and code reviews'
+    },
+  ];
+
+  return (
+    <section
+      className="min-h-screen flex items-center justify-center px-6 py-32 bg-[#1a1a1a]"
+    >
+      <div className="max-w-7xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 50 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+          viewport={{ once: true }}
+          className="text-center mb-20"
+        >
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="h-px w-12 bg-white/10" />
+            <span className="text-gray-500 font-mono text-xs tracking-widest uppercase">Interoperability</span>
+            <div className="h-px w-12 bg-white/10" />
+          </div>
+          <h2 className="text-5xl md:text-6xl font-bold text-white mb-6">
+            Integrations
+          </h2>
+          <p className="text-xl text-gray-400 max-w-3xl mx-auto font-light">
+            Seamlessly connect with the tools you already use to enhance your workflow
+          </p>
+        </motion.div>
+
+        <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-6 max-w-6xl mx-auto mb-16">
+          {integrations.map((integration, index) => (
+            <motion.div
+              key={integration.name}
+              initial={{ opacity: 0, scale: 0.8 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.6, delay: index * 0.1 }}
+              viewport={{ once: true }}
+              whileHover={{ y: -10 }}
+              className="relative group"
+            >
+              <div className="absolute -top-1 -left-1 w-3 h-3 border-l border-t border-white/10 group-hover:border-white/20 transition-colors" />
+              <div className="absolute -top-1 -right-1 w-3 h-3 border-r border-t border-white/10 group-hover:border-white/20 transition-colors" />
+              <div className="absolute -bottom-1 -left-1 w-3 h-3 border-l border-b border-white/10 group-hover:border-white/20 transition-colors" />
+              <div className="absolute -bottom-1 -right-1 w-3 h-3 border-r border-b border-white/10 group-hover:border-white/20 transition-colors" />
+              
+              <div className="bg-white p-8 transition-all duration-300 flex flex-col items-center justify-center relative overflow-hidden min-h-[180px]">
+                <img 
+                  src={integration.logo} 
+                  alt={integration.name}
+                  className="w-full h-auto max-h-16 object-contain relative z-10 mb-3"
+                />
+                <p className="text-xs text-gray-600 text-center font-mono leading-tight">
+                  {integration.description}
+                </p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="max-w-4xl mx-auto mt-20">
+          <TypeAnimation
+            sequence={[
+              randomText,
+              2000
+            ]}
+            wrapper="p"
+            speed={50}
+            className="text-gray-300 font-mono text-base leading-relaxed text-center"
+          />
         </div>
       </div>
     </section>

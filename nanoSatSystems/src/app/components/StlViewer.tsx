@@ -30,8 +30,7 @@ export function StlViewer({ className = '' }: StlViewerProps) {
     scene.background = new THREE.Color(0x0f172a);
 
     // Camera setup
-    const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 2000);
-    camera.position.set(150, 150, 150);
+    const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 5000);
 
     // Renderer setup
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -63,12 +62,27 @@ export function StlViewer({ className = '' }: StlViewerProps) {
     mesh.receiveShadow = true;
     scene.add(mesh);
 
+    // Fit camera to geometry bounds
+    geometry.computeBoundingBox();
+    const bbox = geometry.boundingBox;
+    if (bbox) {
+      const size = new THREE.Vector3();
+      bbox.getSize(size);
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const distance = Math.max(50, maxDim * 1.5);
+      camera.position.set(distance, distance, distance);
+    } else {
+      camera.position.set(150, 150, 150);
+    }
+
     // Controls
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.minDistance = 20;
-    controls.maxDistance = 500;
+    controls.minDistance = 10;
+    controls.maxDistance = 5000;
+    controls.target.set(0, 0, 0);
+    controls.update();
 
     // Animation loop
     let animationId: number;
@@ -246,7 +260,10 @@ export function StlViewer({ className = '' }: StlViewerProps) {
         <div
           ref={containerRef}
           className="absolute inset-0"
-          style={{ display: hasModel ? 'block' : 'none' }}
+          style={{
+            opacity: hasModel ? 1 : 0,
+            pointerEvents: hasModel ? 'auto' : 'none',
+          }}
         />
 
         {!hasModel && (

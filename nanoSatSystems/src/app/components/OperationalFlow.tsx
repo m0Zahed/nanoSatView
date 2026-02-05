@@ -835,6 +835,7 @@ export function OperationalFlow() {
 
       {/* Toolbar */}
       <div className="bg-[#1a1a1a] border-b border-white/10 p-3 flex items-center gap-2 relative z-20">
+        <h1 className="text-xl font-serif text-white mr-4">Operational Flow</h1>
         <span className="text-sm text-gray-400 mr-2 font-mono">Add Node:</span>
         <Button
           size="sm"

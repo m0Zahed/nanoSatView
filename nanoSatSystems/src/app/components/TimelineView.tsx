@@ -45,7 +45,7 @@ export function TimelineView({
       <div className="bg-[#1a1a1a] border-b border-white/10 px-6 py-4 relative">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white font-mono tracking-wider">TIMELINE</h1>
+            <h1 className="text-2xl font-serif text-white">Timeline</h1>
             <p className="text-sm text-gray-500 mt-1 font-mono">{projectName}</p>
           </div>
           {!isEditing && timeline && (

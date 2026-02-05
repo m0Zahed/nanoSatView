@@ -4,32 +4,25 @@ import { motion } from 'motion/react';
 import { Satellite, ChevronRight, Zap, Shield, Users, Target, ChevronDown } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { TypeAnimation } from 'react-type-animation';
+import { Footer } from '@/app/components/Footer';
 import capellaLogo from '@/assets/4cd63406e6ab2d332d6361418a9c6bf4fb53dca0.png';
-import mslLogo from '@/assets/4e00837761b0379aa948797089aeee4e36f60ac7.png';
 import githubLogo from '@/assets/d7c9b449ae05744848c56899970eefd75390854e.png';
 import diagramGPTLogo from '@/assets/5234ef8dd429a3869ddae4436a895d1252b4570a.png';
-import { Footer } from '@/app/components/Footer';
+import googleDocsLogo from '@/assets/google-docs.svg';
+import googleSheetsLogo from '@/assets/google-sheets.svg';
+import googleChatLogo from '@/assets/google-chat.svg';
 
 // Pre-generated text descriptions for random selection
 const COMPLETE_PLATFORM_TEXTS = [
-  "Real-time satellite tracking and orbital prediction with sub-meter accuracy. Monitor telemetry streams, analyze anomalies, and execute command sequences through our encrypted ground station network.",
-  "Advanced trajectory optimization and attitude control analysis. Calculate delta-v requirements, design maneuver sequences, and validate guidance algorithms with industry-standard astrodynamics tools.",
-  "Integrated systems engineering environment for end-to-end mission lifecycle management. From requirements capture through operations, maintain full traceability across all project phases.",
-  "Multi-domain modeling and simulation framework supporting concurrent engineering workflows. Validate system designs against mission requirements using physics-based models and Monte Carlo analysis."
+  "Integrated systems engineering environment for end-to-end mission lifecycle management. From requirements capture through operations, maintain full traceability across all project phases."
 ];
 
 const EVERYTHING_YOU_NEED_TEXTS = [
-  "Semantic vector embeddings enable context-aware document retrieval across terabytes of technical documentation. Query using natural language and receive ranked results based on conceptual similarity.",
-  "Graph neural networks map relationships between requirements, design artifacts, and verification activities. Detect orphaned requirements, circular dependencies, and inconsistencies before they impact mission success.",
-  "Natural language processing extracts structured requirements from informal specifications and legacy documents. Automated traceability matrices link requirements to design elements, test cases, and verification procedures.",
-  "Transformer-based models generate test procedures from system requirements and interface specifications. Automated test oracles validate expected behaviors against actual outputs, detecting subtle anomalies."
+  "Semantic vector embeddings enable context-aware document retrieval across gigabytes of technical documentation. Query using natural language and receive ranked results based on conceptual similarity."
 ];
 
 const INTEGRATIONS_TEXTS = [
-  "Bidirectional synchronization ensures all connected tools maintain consistent state. Changes propagate automatically through webhooks and event-driven architecture, eliminating manual data transfer.",
-  "Multi-user concurrent editing with operational transformation algorithms. Conflict resolution engines handle simultaneous modifications across distributed teams working in different tools.",
-  "Real-time data replication across cloud and on-premises deployments. Encrypted communication channels ensure data integrity during transit. Version control integration tracks changes across CAD models.",
-  "Plugin architecture supports custom tool integrations without modifying core platform. OAuth 2.0 and SAML authentication protocols integrate with enterprise identity management systems."
+  "Integrations across several platforms.",
 ];
 
 const VIDEO_SOURCES = Object.values(
@@ -191,11 +184,8 @@ export function LandingPage() {
       {/* Section 2: Features */}
       <Section2 />
 
-      {/* Section 3: Technology */}
+      {/* Section 3: Integrations */}
       <Section3 />
-
-      {/* Section 4: Collaboration */}
-      <Section4 />
 
       {/* Footer */}
       <Footer />
@@ -583,22 +573,32 @@ function Section3() {
     { 
       logo: capellaLogo, 
       name: 'Capella',
-      description: 'Systems architecture modeling with automated requirement synthesis and design validation workflows'
-    },
-    { 
-      logo: mslLogo, 
-      name: 'MSL',
-      description: 'Mission systems library integration for standardized component catalogs and heritage design patterns'
-    },
-    { 
-      logo: githubLogo, 
-      name: 'GitHub',
-      description: 'Version control synchronization with automated change tracking and collaborative design review pipelines'
+      description: 'Satellite imagery and analytics'
     },
     { 
       logo: diagramGPTLogo, 
       name: 'DiagramGPT',
-      description: 'AI-powered diagram generation from natural language specifications and automatic visual documentation'
+      description: 'AI-powered diagram generation'
+    },
+    { 
+      logo: googleChatLogo, 
+      name: 'Google Chat',
+      description: 'Team messaging and collaboration'
+    },
+    { 
+      logo: googleDocsLogo, 
+      name: 'Google Docs',
+      description: 'Documentation workflows and exports'
+    },
+    { 
+      logo: googleSheetsLogo, 
+      name: 'Google Sheets',
+      description: 'Requirements tracking and reporting'
+    },
+    { 
+      logo: githubLogo, 
+      name: 'GitHub',
+      description: 'Version control and code reviews'
     },
   ];
 
@@ -627,7 +627,7 @@ function Section3() {
           </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-4 gap-6 max-w-6xl mx-auto mb-16">
+        <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-6 max-w-6xl mx-auto mb-16">
           {integrations.map((integration, index) => (
             <motion.div
               key={integration.name}
@@ -668,72 +668,6 @@ function Section3() {
             className="text-gray-300 font-mono text-base leading-relaxed text-center"
           />
         </div>
-      </div>
-    </section>
-  );
-}
-
-function Section4() {
-  return (
-    <section
-      className="min-h-screen flex items-center justify-center px-6 py-32 bg-[#1a1a1a]"
-    >
-      <div className="max-w-7xl mx-auto text-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.8 }}
-          viewport={{ once: true }}
-          className="mb-20"
-        >
-          <div className="flex items-center justify-center gap-3 mb-6">
-            <div className="h-px w-12 bg-white/10" />
-            <span className="text-gray-500 font-mono text-xs tracking-widest uppercase">Mission Partners</span>
-            <div className="h-px w-12 bg-white/10" />
-          </div>
-          <h2 className="text-5xl md:text-7xl font-bold mb-4 text-white">
-            Users/Collaborators
-          </h2>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          viewport={{ once: true }}
-          className="flex items-center justify-center mb-20"
-        >
-          <div className="relative group">
-            <div className="absolute -top-2 -left-2 w-6 h-6 border-l border-t border-white/10 group-hover:border-white/20 transition-colors" />
-            <div className="absolute -top-2 -right-2 w-6 h-6 border-r border-t border-white/10 group-hover:border-white/20 transition-colors" />
-            <div className="absolute -bottom-2 -left-2 w-6 h-6 border-l border-b border-white/10 group-hover:border-white/20 transition-colors" />
-            <div className="absolute -bottom-2 -right-2 w-6 h-6 border-r border-b border-white/10 group-hover:border-white/20 transition-colors" />
-            
-            <div className="bg-white p-16 transition-all duration-300 relative overflow-hidden">
-              <img 
-                src={capellaLogo} 
-                alt="Capella"
-                className="w-64 h-auto object-contain relative z-10"
-              />
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          viewport={{ once: true }}
-        >
-          <Button
-            size="lg"
-            className="bg-white hover:bg-gray-200 text-black font-bold text-lg px-12 py-7"
-            onClick={() => window.location.href = '/signup'}
-          >
-            <Target className="mr-2 h-5 w-5" />
-            Join Our Community
-          </Button>
-        </motion.div>
       </div>
     </section>
   );

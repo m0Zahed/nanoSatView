@@ -6,6 +6,7 @@ public record RequirementCreateDto(
     string Type,
     RequirementLevel Level,
     string Subsystem,
+    Guid RequirementsListId,
     string[] Tags
 );
 
@@ -15,5 +16,6 @@ public record RequirementUpdateDto(
     string Type,
     RequirementLevel Level,
     string Subsystem,
+    Guid RequirementsListId,
     string[] Tags
 );

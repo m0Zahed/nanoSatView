@@ -15,6 +15,7 @@ public class RequirementsDbContext : DbContext
     public DbSet<ProjectInvite> ProjectInvites => Set<ProjectInvite>();
     public DbSet<MemberProjectIndex> MemberProjectIndexes => Set<MemberProjectIndex>();
     public DbSet<OrganizationProjectIndex> OrganizationProjectIndexes => Set<OrganizationProjectIndex>();
+    public DbSet<RequirementsList> RequirementsLists => Set<RequirementsList>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -70,5 +71,17 @@ public class RequirementsDbContext : DbContext
             entity.Property(i => i.ProjectIds)
                 .HasColumnType("text[]");
         });
+
+        modelBuilder.Entity<Requirement>()
+            .HasOne(r => r.RequirementsList)
+            .WithMany(l => l.Requirements)
+            .HasForeignKey(r => r.RequirementsListId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Project>()
+            .HasOne(p => p.RequirementsList)
+            .WithMany()
+            .HasForeignKey(p => p.RequirementsListId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

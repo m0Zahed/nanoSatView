@@ -105,7 +105,7 @@ export function DashboardHome() {
           transition={{ duration: 0.6, ease: [0.6, 0.05, 0.01, 0.9] }}
           className="space-y-2"
         >
-          <h1 className="text-6xl font-bold text-white tracking-tight" style={{ fontFamily: 'serif' }}>
+          <h1 className="text-6xl font-bold text-white tracking-tight font-serif">
             Dashboard
           </h1>
           <motion.p

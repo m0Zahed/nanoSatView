@@ -51,6 +51,15 @@ export type OrganizationProjects = {
   projects: Project[];
 };
 
+export type Organization = {
+  id: string;
+  name: string;
+  initials: string;
+  color: string;
+  inviteLink: string;
+  createdAt: string;
+};
+
 type MockInvite = {
   projectId: string;
   expiresAt: string;
@@ -127,6 +136,7 @@ async function mockRequest<T = JsonValue>(
   path: string,
   options: RequestInit = {}
 ): Promise<{ status: number; data: T | JsonValue }> {
+
   const method = String(options.method || 'GET').toUpperCase();
   const body = parseJsonBody(options.body);
   const now = new Date();
@@ -174,6 +184,34 @@ async function mockRequest<T = JsonValue>(
 
     mockProjects = [...mockProjects, project];
     return { status: 201, data: project as T };
+  }
+
+  if ((path === '/organisations' || path === '/organizations') && method === 'POST') {
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    if (!name) {
+      return {
+        status: 400,
+        data: { error: { code: 'INVALID_ORGANIZATION', message: 'Organization name is required.' } },
+      };
+    }
+
+    const initials = name
+      .split(' ')
+      .map((word) => word[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+
+    const org: Organization = {
+      id: createMockId('mock-org'),
+      name,
+      initials,
+      color: typeof body.color === 'string' ? body.color : 'bg-indigo-500',
+      inviteLink: `${name.toLowerCase().replace(/\s+/g, '-')}-${Math.random().toString(36).substring(2, 10)}`,
+      createdAt: now.toISOString(),
+    };
+
+    return { status: 201, data: org as T };
   }
 
   const projectMatch = path.match(/^\/projects\/([^/]+)$/);
@@ -227,11 +265,14 @@ async function mockRequest<T = JsonValue>(
       } as T,
     };
   }
-
+  
+  // Projects 
   if (path === '/projects/join' && method === 'POST') {
+
     const token = typeof body.token === 'string' ? body.token : '';
     const memberId = typeof body.memberId === 'string' ? body.memberId : '';
     const invite = token ? mockInvites.get(token) : null;
+
     if (!invite || new Date(invite.expiresAt).getTime() < now.getTime()) {
       return {
         status: 400,
@@ -289,7 +330,7 @@ async function request<T = JsonValue>(
   if (USE_MOCK_REQUIREMENTS_API) {
     return mockRequest<T>(path, options);
   }
-
+  
   const response = await fetch(`${PROJECTS_BASE_URL}${path}`, {
     credentials: 'include',
     ...options,
@@ -298,6 +339,7 @@ async function request<T = JsonValue>(
       ...(options.headers || {}),
     },
   });
+
   const data = await readJson(response);
   return { status: response.status, data: data as T };
 }
@@ -308,6 +350,13 @@ export async function fetchProjects() {
 
 export async function createProject(payload: Partial<Project>) {
   return request<Project>('/projects', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function createOrganization(payload: { name: string; color?: string }) {
+  return request<Organization>('/organisations', {
     method: 'POST',
     body: JSON.stringify(payload),
   });

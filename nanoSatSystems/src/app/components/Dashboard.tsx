@@ -22,6 +22,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/app/
 import { ProjectMembersDialog } from '@/app/components/ProjectMembersDialog';
 import { useAuth } from '@/app/auth/AuthContext';
 import {
+  createOrganization as apiCreateOrganization,
   createProject as apiCreateProject,
   deleteProject as apiDeleteProject,
   fetchProjects,
@@ -77,27 +78,44 @@ interface OrgJoinRequest {
 
 export function Dashboard() {
   const navigate = useNavigate();
+
+
   const { signOut, user } = useAuth();
+
+  // Organizations 
   const [organizations, setOrganizations] = useState<Organization[]>([
     { id: 'personal', name: 'Personal Projects', initials: 'PP', color: 'bg-green-500', inviteLink: 'personal-xyz789' },
   ]);
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>('personal');
+  const [isOrgDialogOpen, setIsOrgDialogOpen] = useState(false);
+
+  // Projects  
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [isOrgDialogOpen, setIsOrgDialogOpen] = useState(false);
+
+  // Project 
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
+
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  
+  // Create Organisation or Project
   const [newOrgName, setNewOrgName] = useState('');
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectDescription, setNewProjectDescription] = useState('');
+  
+  // Join organisation
   const [joinOrgName, setJoinOrgName] = useState('');
   const [inviteLink, setInviteLink] = useState('');
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
+  
+  // Member cobfigurations
   const [isAddMemberDialogOpen, setIsAddMemberDialogOpen] = useState(false);
   const [selectedProjectForMember, setSelectedProjectForMember] = useState<string | null>(null);
   const [newMemberEmail, setNewMemberEmail] = useState('');
+  
+  // Nabigation states
   const [currentView, setCurrentView] = useState<'project' | 'requirements' | 'timeline' | 'components' | 'members'>('project');
   const [activeProjectTab, setActiveProjectTab] = useState<string>('overview');
   const [isUserSettingsOpen, setIsUserSettingsOpen] = useState(false);
@@ -120,13 +138,16 @@ export function Dashboard() {
   // Load projects from API
   useEffect(() => {
     const load = async () => {
+
       setIsLoadingProjects(true);
       const userId = currentUserId;
       if (userId) {
+        
+        // Fetch organizations for a particular member
         const { status, data } = await fetchOrganizationsWithProjects(userId);
         if (status === 200 && Array.isArray(data)) {
           const orgProjects = data as ApiOrganizationProjects[];
-
+           
           const mappedProjects: Project[] = orgProjects.flatMap((op) =>
             op.projects.map((p) => ({
               id: p.id,
@@ -193,33 +214,44 @@ export function Dashboard() {
   }, [user]);
 
   const currentUserId = useMemo(() => user?.id ?? user?.email ?? 'me', [user]);
+  
+  // Create a new organisation 
+  const handleCreateOrganization = async () => {
+    const orgName = newOrgName.trim();
+    if (!orgName) return;
 
-  const handleCreateOrganization = () => {
-    if (!newOrgName.trim()) return;
+    const { status, data } = await apiCreateOrganization({ name: orgName, color: 'bg-indigo-500' });
+    if (status !== 201 || !data || Array.isArray(data)) {
+      setAlertMessage('Failed to create organization. Please try again.');
+      setShowSuccessAlert(true);
+      return;
+    }
 
-    const initials = newOrgName
-      .split(' ')
-      .map((word) => word[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-
-    const newOrg: Organization = {
-      id: Date.now().toString(),
-      name: newOrgName,
-      initials,
-      color: 'bg-indigo-500',
-      inviteLink: `${newOrgName.toLowerCase().replace(/\s+/g, '-')}-${Math.random().toString(36).substring(7)}`,
+    const created = data as {
+      id: string;
+      name: string;
+      initials?: string;
+      color?: string;
+      inviteLink?: string;
     };
 
-    setOrganizations([...organizations, newOrg]);
+    const newOrg: Organization = {
+      id: created.id,
+      name: created.name,
+      initials: created.initials || orgName.split(' ').map((word) => word[0]).join('').toUpperCase().slice(0, 2),
+      color: created.color || 'bg-indigo-500',
+      inviteLink: created.inviteLink,
+    };
+
+    setOrganizations((prev) => [...prev, newOrg]);
     setSelectedOrgId(newOrg.id);
     setNewOrgName('');
     setIsOrgDialogOpen(false);
-    setAlertMessage(`Organization "${newOrgName}" created successfully!`);
+    setAlertMessage(`Organization "${newOrg.name}" created successfully!`);
     setShowSuccessAlert(true);
   };
-
+  
+  // =========================== CREATE JOIN REQUESTS ====================================================
   const handleSendJoinRequest = () => {
     if (!joinOrgName.trim()) return;
 

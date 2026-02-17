@@ -74,12 +74,12 @@ app.MapPost("/requirements", async (RequirementCreateDto input, RequirementsDbCo
         return Results.BadRequest(new { error = "Invalid requirement payload." });
     }
 
-    var listExists = await db.RequirementsLists
+    var projectExists = await db.Projects
         .AsNoTracking()
-        .AnyAsync(l => l.Id == input.RequirementsListId);
-    if (!listExists)
+        .AnyAsync(p => p.Id == input.ProjectId);
+    if (!projectExists)
     {
-        return Results.BadRequest(new { error = "RequirementsListId does not exist." });
+        return Results.BadRequest(new { error = "ProjectId does not exist." });
     }
 
     var requirement = new Requirement
@@ -89,7 +89,7 @@ app.MapPost("/requirements", async (RequirementCreateDto input, RequirementsDbCo
         Type = input.Type.Trim(),
         Level = input.Level,
         Subsystem = input.Subsystem.Trim(),
-        RequirementsListId = input.RequirementsListId,
+        ProjectId = input.ProjectId,
         Tags = NormalizeTags(input.Tags),
     };
 
@@ -106,12 +106,12 @@ app.MapPut("/requirements/{id:guid}", async (Guid id, RequirementUpdateDto input
         return Results.BadRequest(new { error = "Invalid requirement payload." });
     }
 
-    var listExists = await db.RequirementsLists
+    var projectExists = await db.Projects
         .AsNoTracking()
-        .AnyAsync(l => l.Id == input.RequirementsListId);
-    if (!listExists)
+        .AnyAsync(p => p.Id == input.ProjectId);
+    if (!projectExists)
     {
-        return Results.BadRequest(new { error = "RequirementsListId does not exist." });
+        return Results.BadRequest(new { error = "ProjectId does not exist." });
     }
 
     var requirement = await db.Requirements.FirstOrDefaultAsync(r => r.Id == id);
@@ -125,7 +125,7 @@ app.MapPut("/requirements/{id:guid}", async (Guid id, RequirementUpdateDto input
     requirement.Type = input.Type.Trim();
     requirement.Level = input.Level;
     requirement.Subsystem = input.Subsystem.Trim();
-    requirement.RequirementsListId = input.RequirementsListId;
+    requirement.ProjectId = input.ProjectId;
     requirement.Tags = NormalizeTags(input.Tags);
 
     await db.SaveChangesAsync();
@@ -163,17 +163,13 @@ app.MapGet("/projects/{id:guid}", async (Guid id, RequirementsDbContext db) =>
     return project is null ? Results.NotFound() : Results.Ok(project);
 });
 
-app.MapPost("/projects", async (ProjectCreateDto input, RequirementsDbContext db, IConfiguration config) =>
+app.MapPost("/projects", async (ProjectCreateDto input, RequirementsDbContext db) =>
 {
     var normalized = NormalizeProjectCreate(input);
     if (!IsValidProject(normalized.Name, normalized.Owner, normalized.DocumentIds, normalized.MemberIds, normalized.PendingRequests, normalized.OrganizationId, normalized.PersonalProject))
     {
         return Results.BadRequest(new { error = "Invalid project payload." });
     }
-
-    // Always create a list so Requirements can FK to something real.
-    var requirementsList = new RequirementsList();
-    db.RequirementsLists.Add(requirementsList);
 
     var project = new Project
     {
@@ -183,7 +179,6 @@ app.MapPost("/projects", async (ProjectCreateDto input, RequirementsDbContext db
         IsPublic = normalized.IsPublic,
         PersonalProject = normalized.PersonalProject,
         OrganizationId = normalized.OrganizationId,
-        RequirementsListId = requirementsList.Id,
         ComponentsListId = normalized.ComponentsListId,
         TimelineId = normalized.TimelineId,
         IntegrationsId = normalized.IntegrationsId,
@@ -214,19 +209,6 @@ app.MapPut("/projects/{id:guid}", async (Guid id, ProjectUpdateDto input, Requir
     if (project is null)
     {
         return Results.NotFound();
-    }
-
-    if (normalized.RequirementsListId is Guid listId)
-    {
-        var listExists = await db.RequirementsLists
-            .AsNoTracking()
-            .AnyAsync(l => l.Id == listId);
-        if (!listExists)
-        {
-            return Results.BadRequest(new { error = "RequirementsListId does not exist." });
-        }
-
-        project.RequirementsListId = listId;
     }
 
     var previousMembers = project.MemberIds.ToArray();
@@ -432,7 +414,7 @@ static bool IsValidRequirementCreate(RequirementCreateDto input)
         input.Description,
         input.Type,
         input.Subsystem,
-        input.RequirementsListId,
+        input.ProjectId,
         input.Tags
     );
 }
@@ -444,7 +426,7 @@ static bool IsValidRequirementUpdate(RequirementUpdateDto input)
         input.Description,
         input.Type,
         input.Subsystem,
-        input.RequirementsListId,
+        input.ProjectId,
         input.Tags
     );
 }
@@ -454,14 +436,14 @@ static bool IsValidRequirementFields(
     string description,
     string type,
     string subsystem,
-    Guid requirementsListId,
+    Guid projectId,
     string[] tags)
 {
     return !string.IsNullOrWhiteSpace(title)
         && !string.IsNullOrWhiteSpace(description)
         && !string.IsNullOrWhiteSpace(type)
         && !string.IsNullOrWhiteSpace(subsystem)
-        && requirementsListId != Guid.Empty
+        && projectId != Guid.Empty
         && tags is { Length: > 0 };
 }
 
@@ -496,7 +478,6 @@ static ProjectCreateDto NormalizeProjectCreate(ProjectCreateDto input)
         Owner = input.Owner.Trim(),
         PersonalProject = personal,
         OrganizationId = orgId,
-        RequirementsListId = input.RequirementsListId,
         ComponentsListId = (input.ComponentsListId ?? string.Empty).Trim(),
         TimelineId = (input.TimelineId ?? string.Empty).Trim(),
         IntegrationsId = (input.IntegrationsId ?? string.Empty).Trim(),
@@ -522,7 +503,6 @@ static ProjectUpdateDto NormalizeProjectUpdate(ProjectUpdateDto input)
         Owner = input.Owner.Trim(),
         PersonalProject = personal,
         OrganizationId = orgId,
-        RequirementsListId = input.RequirementsListId,
         ComponentsListId = (input.ComponentsListId ?? string.Empty).Trim(),
         TimelineId = (input.TimelineId ?? string.Empty).Trim(),
         IntegrationsId = (input.IntegrationsId ?? string.Empty).Trim(),

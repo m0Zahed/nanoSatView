@@ -30,7 +30,7 @@ public class Requirement
     public string[] Tags { get; set; } = Array.Empty<string>();
 
     [Required]
-    public Guid RequirementsListId { get; set; }
+    public Guid ProjectId { get; set; }
 
-    public RequirementsList? RequirementsList { get; set; }
+    public Project? Project { get; set; }
 }

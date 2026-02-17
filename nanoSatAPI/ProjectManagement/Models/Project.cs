@@ -37,8 +37,7 @@ public class Project
     [MaxLength(200)]
     public string OrganizationId { get; set; } = string.Empty;
 
-    public Guid RequirementsListId { get; set; }
-    public RequirementsList? RequirementsList { get; set; }
+    public ICollection<Requirement> Requirements { get; set; } = new List<Requirement>();
 
     [MaxLength(200)]
     public string ComponentsListId { get; set; } = string.Empty;

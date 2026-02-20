@@ -179,13 +179,17 @@ export function Dashboard() {
               color: 'bg-indigo-500',
             };
           });
-
+          
+          // ================ set the Organisation state and  Projects states ==========
           setOrganizations(mappedOrganizations.length > 0 ? mappedOrganizations : organizations);
           setProjects(mappedProjects);
+          
           if (!selectedOrgId && mappedOrganizations.length > 0) {
             setSelectedOrgId(mappedOrganizations[0].id);
           }
+
         } else {
+
           // fallback to existing fetch if new endpoint fails
           const { status: fallbackStatus, data: fallbackData } = await fetchProjects();
           if (fallbackStatus === 200 && Array.isArray(fallbackData)) {
@@ -196,7 +200,7 @@ export function Dashboard() {
               createdAt: new Date(p.createdAt),
               organizationId: p.organizationId || 'personal',
               personalProject: p.personalProject || p.organizationId === 'personal',
-              members: members,
+              members: membersclea,
               requirements: p.requirementsListId ? [p.requirementsListId] : [],
               timeline: p.timelineId || '',
               components: p.componentsListId ? [p.componentsListId] : [],
@@ -308,7 +312,15 @@ export function Dashboard() {
   const handleRemoveRequest = (requestId: string) => {
     setJoinRequests(joinRequests.filter((req) => req.id !== requestId));
   };
-
+  
+  /**
+   * handleCreateProject: 
+   * 
+   * 
+   * 
+   * 
+   * 
+   */
   const handleCreateProject = async () => {
     if (!newProjectName.trim()) return;
 
@@ -339,7 +351,8 @@ export function Dashboard() {
         personalProject: projData.personalProject || projData.organizationId === 'personal',
         members: members,
       };
-
+      
+      // Set the projects list
       setProjects([...projects, newProject]);
       setSelectedProjectId(newProject.id);
       setNewProjectName('');
@@ -352,7 +365,11 @@ export function Dashboard() {
       setShowSuccessAlert(true);
     }
   };
-
+  
+  /**
+   * Delete Project
+   *
+   */
   const handleDeleteProject = async (projectId: string) => {
     const prev = projects;
     setProjects(projects.filter((p) => p.id !== projectId));
@@ -366,7 +383,11 @@ export function Dashboard() {
       setShowSuccessAlert(true);
     }
   };
-
+  
+  /**
+   *  Approve join request  
+   *
+   */
   const handleApproveJoinRequest = (requestId: string) => {
     setOrgJoinRequests(orgJoinRequests.filter((req) => req.id !== requestId));
     setAlertMessage('Join request approved!');
@@ -476,7 +497,7 @@ export function Dashboard() {
     setSelectedProjectId(projectId);
     setCurrentView('requirements');
   };
-
+  
   const handleAddRequirementInView = (requirement: string) => {
     if (!selectedProjectId) return;
 

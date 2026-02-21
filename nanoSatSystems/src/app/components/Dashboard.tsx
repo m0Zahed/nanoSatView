@@ -20,14 +20,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/ta
 import { Alert, AlertDescription } from '@/app/components/ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/app/components/ui/tooltip';
 import { ProjectMembersDialog } from '@/app/components/ProjectMembersDialog';
-import { useAuth } from '@/app/auth/AuthContext';
+import { useAuth, type User } from '@/app/auth/AuthContext';
 import {
   createOrganization as apiCreateOrganization,
   createProject as apiCreateProject,
   deleteProject as apiDeleteProject,
   fetchProjects,
-  joinProject as apiJoinProject,
+  joinOrganization as apiJoinOrganization,
   fetchOrganizationsWithProjects,
+  OrganizationMember as ApiOrganizationMember,
   Project as ApiProject,
   OrganizationProjects as ApiOrganizationProjects,
 } from '@/app/api/projects';
@@ -74,6 +75,58 @@ interface OrgJoinRequest {
   timestamp: Date;
   initials: string;
   organizationId: string;
+}
+
+function getInitials(value: string) {
+  return value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+function normalizeRole(role: unknown): 'admin' | 'member' {
+  return String(role || '').toLowerCase() === 'admin' ? 'admin' : 'member';
+}
+
+function mapApiMemberToMember(raw: ApiOrganizationMember): Member | null {
+  if (!raw || typeof raw.id !== 'string' || !raw.id) {
+    return null;
+  }
+  const displayName =
+    (typeof raw.name === 'string' && raw.name.trim()) ||
+    (typeof raw.fullName === 'string' && raw.fullName.trim()) ||
+    (typeof raw.username === 'string' && raw.username.trim()) ||
+    (typeof raw.email === 'string' && raw.email.trim()) ||
+    'Unknown Member';
+  const email = typeof raw.email === 'string' && raw.email ? raw.email : `${raw.id}@unknown.local`;
+  const initials =
+    (typeof raw.initials === 'string' && raw.initials.trim()) || getInitials(displayName || email || raw.id);
+
+  return {
+    id: raw.id,
+    name: displayName,
+    email,
+    role: normalizeRole(raw.organizationRole ?? raw.role),
+    initials,
+  };
+}
+
+function createCurrentUserMember(user: User | null): Member | null {
+  if (!user?.id) {
+    return null;
+  }
+  const name = user.fullName?.trim() || user.username?.trim() || user.email;
+  return {
+    id: user.id,
+    name,
+    email: user.email,
+    role: user.isAdmin ? 'admin' : 'member',
+    initials: getInitials(name),
+  };
 }
 
 export function Dashboard() {
@@ -123,11 +176,8 @@ export function Dashboard() {
   const [currentPage, setCurrentPage] = useState<'dashboard' | 'systems' | 'view'>('dashboard');
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
 
-  // Mock members and org join requests
-  const [members] = useState<Member[]>([
-    { id: '1', name: 'John Doe', email: 'john@example.com', role: 'admin', initials: 'JD' },
-    { id: '2', name: 'Jane Smith', email: 'jane@example.com', role: 'member', initials: 'JS' },
-  ]);
+  // Organization member directory
+  const [members, setMembers] = useState<Member[]>([]);
   const [orgJoinRequests, setOrgJoinRequests] = useState<OrgJoinRequest[]>([]);
 
   const handleLogout = async () => {
@@ -135,19 +185,85 @@ export function Dashboard() {
     navigate('/');
   };
 
+  useEffect(() => {
+    const currentUserMember = createCurrentUserMember(user);
+    if (currentUserMember) {
+      setMembers([currentUserMember]);
+    } else {
+      setMembers([]);
+    }
+  }, [user]);
+
   // Load projects from API
   useEffect(() => {
     const load = async () => {
-
       setIsLoadingProjects(true);
-      const userId = currentUserId;
-      if (userId) {
-        
+      try {
+        const userId = currentUserId;
+        if (!userId) {
+          return;
+        }
+
         // Fetch organizations for a particular member
         const { status, data } = await fetchOrganizationsWithProjects(userId);
         if (status === 200 && Array.isArray(data)) {
           const orgProjects = data as ApiOrganizationProjects[];
-           
+
+          const memberMap = new Map<string, Member>();
+          const upsertMember = (candidate: Member | null) => {
+            if (!candidate?.id) {
+              return;
+            }
+            if (!memberMap.has(candidate.id)) {
+              memberMap.set(candidate.id, candidate);
+              return;
+            }
+            const existing = memberMap.get(candidate.id)!;
+            memberMap.set(candidate.id, {
+              ...existing,
+              ...candidate,
+              role: existing.role === 'admin' || candidate.role === 'admin' ? 'admin' : 'member',
+            });
+          };
+
+          upsertMember(createCurrentUserMember(user));
+
+          for (const op of orgProjects) {
+            const orgCandidates = [...(op.members || []), ...(op.organizationMembers || [])];
+            for (const candidate of orgCandidates) {
+              upsertMember(mapApiMemberToMember(candidate));
+            }
+            for (const project of op.projects) {
+              for (const candidate of project.members || []) {
+                upsertMember(mapApiMemberToMember(candidate));
+              }
+            }
+          }
+
+          for (const op of orgProjects) {
+            for (const project of op.projects) {
+              for (const memberId of project.memberIds || []) {
+                if (!memberMap.has(memberId)) {
+                  const isCurrentUser =
+                    memberId === user?.id || memberId === user?.email || memberId === currentUserId;
+                  const currentUserMember = isCurrentUser ? createCurrentUserMember(user) : null;
+                  upsertMember(
+                    currentUserMember || {
+                      id: memberId,
+                      name: memberId,
+                      email: `${memberId}@unknown.local`,
+                      role: 'member',
+                      initials: getInitials(memberId),
+                    }
+                  );
+                }
+              }
+            }
+          }
+
+          const refreshedMembers = Array.from(memberMap.values());
+          setMembers(refreshedMembers);
+
           const mappedProjects: Project[] = orgProjects.flatMap((op) =>
             op.projects.map((p) => ({
               id: p.id,
@@ -156,16 +272,74 @@ export function Dashboard() {
               createdAt: new Date(p.createdAt),
               organizationId: p.organizationId || op.organizationId || 'personal',
               personalProject: p.personalProject || (p.organizationId || op.organizationId) === 'personal',
-              members: members,
+              members: (p.memberIds || [])
+                .map((memberId) => memberMap.get(memberId))
+                .filter((member): member is Member => Boolean(member)),
               requirements: p.requirementsListId ? [p.requirementsListId] : [],
               timeline: p.timelineId || '',
               components: p.componentsListId ? [p.componentsListId] : [],
             }))
           );
 
+          const getOrganizationName = (op: ApiOrganizationProjects, orgId: string) => {
+            if (orgId === 'personal') {
+              return 'Personal Projects';
+            }
+
+            const opWithVariants = op as ApiOrganizationProjects & {
+              name?: string;
+              title?: string;
+              organization_name?: string;
+              organizationTitle?: string;
+              organisationName?: string;
+            };
+
+            const projectLevelName = op.projects
+              .map((project) => {
+                const projectWithVariants = project as ApiProject & {
+                  organizationName?: string;
+                  orgName?: string;
+                  organisationName?: string;
+                  organization_name?: string;
+                  organizationTitle?: string;
+                  organization?: { name?: string };
+                };
+                return (
+                  (typeof projectWithVariants.organizationName === 'string' &&
+                    projectWithVariants.organizationName.trim()) ||
+                  (typeof projectWithVariants.orgName === 'string' && projectWithVariants.orgName.trim()) ||
+                  (typeof projectWithVariants.organisationName === 'string' &&
+                    projectWithVariants.organisationName.trim()) ||
+                  (typeof projectWithVariants.organization_name === 'string' &&
+                    projectWithVariants.organization_name.trim()) ||
+                  (typeof projectWithVariants.organizationTitle === 'string' &&
+                    projectWithVariants.organizationTitle.trim()) ||
+                  (typeof projectWithVariants.organization?.name === 'string' &&
+                    projectWithVariants.organization.name.trim()) ||
+                  ''
+                );
+              })
+              .find(Boolean);
+
+            const fromPayload =
+              (typeof opWithVariants.name === 'string' && opWithVariants.name.trim()) ||
+              (typeof opWithVariants.title === 'string' && opWithVariants.title.trim()) ||
+              (typeof op.organizationName === 'string' && op.organizationName.trim()) ||
+              (typeof op.orgName === 'string' && op.orgName.trim()) ||
+              (typeof opWithVariants.organization_name === 'string' && opWithVariants.organization_name.trim()) ||
+              (typeof opWithVariants.organizationTitle === 'string' && opWithVariants.organizationTitle.trim()) ||
+              (typeof opWithVariants.organisationName === 'string' && opWithVariants.organisationName.trim()) ||
+              (typeof op.organization?.name === 'string' && op.organization.name.trim()) ||
+              projectLevelName ||
+              organizations.find((org) => org.id === orgId)?.name ||
+              '';
+
+            return fromPayload || 'Unnamed Organization';
+          };
+
           const mappedOrganizations: Organization[] = orgProjects.map((op) => {
             const orgId = op.organizationId || 'personal';
-            const name = orgId === 'personal' ? 'Personal Projects' : `Organization ${orgId}`;
+            const name = getOrganizationName(op, orgId);
             const initials = name
               .split(' ')
               .map((w) => w[0])
@@ -179,37 +353,41 @@ export function Dashboard() {
               color: 'bg-indigo-500',
             };
           });
-          
+
           // ================ set the Organisation state and  Projects states ==========
           setOrganizations(mappedOrganizations.length > 0 ? mappedOrganizations : organizations);
           setProjects(mappedProjects);
-          
+
           if (!selectedOrgId && mappedOrganizations.length > 0) {
             setSelectedOrgId(mappedOrganizations[0].id);
           }
-
-        } else {
-
-          // fallback to existing fetch if new endpoint fails
-          const { status: fallbackStatus, data: fallbackData } = await fetchProjects();
-          if (fallbackStatus === 200 && Array.isArray(fallbackData)) {
-            const mapped: Project[] = (fallbackData as ApiProject[]).map((p) => ({
-              id: p.id,
-              name: p.name,
-              description: p.description,
-              createdAt: new Date(p.createdAt),
-              organizationId: p.organizationId || 'personal',
-              personalProject: p.personalProject || p.organizationId === 'personal',
-              members: membersclea,
-              requirements: p.requirementsListId ? [p.requirementsListId] : [],
-              timeline: p.timelineId || '',
-              components: p.componentsListId ? [p.componentsListId] : [],
-            }));
-            setProjects(mapped);
-          }
+          return;
         }
+
+        // fallback to existing fetch if new endpoint fails
+        const { status: fallbackStatus, data: fallbackData } = await fetchProjects();
+        if (fallbackStatus === 200 && Array.isArray(fallbackData)) {
+          const currentUserMember = createCurrentUserMember(user);
+          if (currentUserMember) {
+            setMembers([currentUserMember]);
+          }
+          const mapped: Project[] = (fallbackData as ApiProject[]).map((p) => ({
+            id: p.id,
+            name: p.name,
+            description: p.description,
+            createdAt: new Date(p.createdAt),
+            organizationId: p.organizationId || 'personal',
+            personalProject: p.personalProject || p.organizationId === 'personal',
+            members: currentUserMember ? [currentUserMember] : [],
+            requirements: p.requirementsListId ? [p.requirementsListId] : [],
+            timeline: p.timelineId || '',
+            components: p.componentsListId ? [p.componentsListId] : [],
+          }));
+          setProjects(mapped);
+        }
+      } finally {
+        setIsLoadingProjects(false);
       }
-      setIsLoadingProjects(false);
     };
     if (user) {
       load();
@@ -283,26 +461,32 @@ export function Dashboard() {
     const token = inviteLink.trim();
     if (!token) return;
 
-    const { status, data } = await apiJoinProject(token, currentUserId);
-    if (status === 200 && data && typeof data === 'object' && 'id' in data) {
-      const projData = data as ApiProject;
-      const mapped: Project = {
-        id: projData.id,
-        name: projData.name,
-        description: projData.description,
-        createdAt: new Date(projData.createdAt),
-        organizationId: projData.organizationId || selectedOrgId || 'personal',
-        personalProject: projData.personalProject || projData.organizationId === 'personal',
-        members: members,
-      };
-      setProjects((prev) => {
-        const exists = prev.find((p) => p.id === mapped.id);
-        return exists ? prev.map((p) => (p.id === mapped.id ? mapped : p)) : [...prev, mapped];
-      });
+    const { status, data } = await apiJoinOrganization(token, currentUserId);
+    if (status === 200 && data && typeof data === 'object' && 'joinedProjectIds' in data) {
       setInviteLink('');
       setIsOrgDialogOpen(false);
-      setAlertMessage(`Joined project "${projData.name}".`);
+      setAlertMessage('Joined organization successfully.');
       setShowSuccessAlert(true);
+      // Reload projects from backend to reflect all projects joined in the organization.
+      const refreshed = await fetchOrganizationsWithProjects(currentUserId);
+      if (refreshed.status === 200 && Array.isArray(refreshed.data)) {
+        const orgProjects = refreshed.data as ApiOrganizationProjects[];
+        const mappedProjects: Project[] = orgProjects.flatMap((op) =>
+          op.projects.map((p) => ({
+            id: p.id,
+            name: p.name,
+            description: p.description,
+            createdAt: new Date(p.createdAt),
+            organizationId: p.organizationId || op.organizationId || 'personal',
+            personalProject: p.personalProject || (p.organizationId || op.organizationId) === 'personal',
+            members: members,
+            requirements: p.requirementsListId ? [p.requirementsListId] : [],
+            timeline: p.timelineId || '',
+            components: p.componentsListId ? [p.componentsListId] : [],
+          }))
+        );
+        setProjects(mappedProjects);
+      }
     } else {
       setAlertMessage('Invalid or expired invite link.');
       setShowSuccessAlert(true);
@@ -732,6 +916,7 @@ export function Dashboard() {
           currentView === 'requirements' && selectedProject ? (
             <RequirementsView
               projectName={selectedProject.name}
+              projectId={selectedProject.id}
               requirements={selectedProject.requirements || []}
               onAddRequirement={handleAddRequirementInView}
               onRemoveRequirement={handleRemoveRequirement}

@@ -1,4 +1,4 @@
-import { Users, UserPlus, Check, X, Copy } from 'lucide-react';
+import { Users, UserPlus, Check, X, Copy, ShieldCheck } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import {
   Dialog,
@@ -55,6 +55,8 @@ export function OrganizationSettings({
   const copyInviteLink = () => {
     navigator.clipboard.writeText(inviteLink);
   };
+  const adminMembers = members.filter((member) => member.role === 'admin');
+  const regularMembers = members.filter((member) => member.role === 'member');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -65,10 +67,14 @@ export function OrganizationSettings({
         </DialogHeader>
 
         <Tabs defaultValue="members" className="flex-1 overflow-hidden flex flex-col">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="members" className="gap-2">
               <Users className="h-4 w-4" />
               Members ({members.length})
+            </TabsTrigger>
+            <TabsTrigger value="roles" className="gap-2">
+              <ShieldCheck className="h-4 w-4" />
+              Roles
             </TabsTrigger>
             <TabsTrigger value="requests" className="gap-2">
               <UserPlus className="h-4 w-4" />
@@ -131,6 +137,50 @@ export function OrganizationSettings({
                         </Button>
                       )}
                     </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Roles Tab */}
+          <TabsContent value="roles" className="flex-1 overflow-auto space-y-4 mt-4">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-lg border bg-slate-50 p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Admin</Label>
+                  <Badge>{adminMembers.length}</Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Can approve join requests, remove members, and manage organization settings.
+                </p>
+              </div>
+              <div className="rounded-lg border bg-slate-50 p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Member</Label>
+                  <Badge variant="secondary">{regularMembers.length}</Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Can access organization projects and collaborate with existing team members.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Role Assignments</Label>
+              <div className="space-y-2">
+                {members.map((member) => (
+                  <div
+                    key={member.id}
+                    className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border"
+                  >
+                    <div>
+                      <p className="text-sm font-medium">{member.name}</p>
+                      <p className="text-xs text-muted-foreground">{member.email}</p>
+                    </div>
+                    <Badge variant={member.role === 'admin' ? 'default' : 'secondary'}>
+                      {member.role}
+                    </Badge>
                   </div>
                 ))}
               </div>

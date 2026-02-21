@@ -18,8 +18,22 @@ const BYPASS_REQUIREMENTS_API = TRUTHY_VALUES.has(
 );
 const IS_TESTING_ENV = envCandidates.includes('testing');
 const USE_MOCK_REQUIREMENTS_API = IS_TESTING_ENV || BYPASS_REQUIREMENTS_API;
+const SHOULD_FALLBACK_TO_MOCK_ON_LOCAL_FAILURE = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(
+  PROJECTS_BASE_URL
+);
 
 type JsonValue = Record<string, unknown> | null;
+
+export type OrganizationMember = {
+  id: string;
+  email?: string;
+  name?: string;
+  fullName?: string;
+  username?: string;
+  role?: string;
+  organizationRole?: string;
+  initials?: string;
+};
 
 export type Project = {
   id: string;
@@ -31,6 +45,7 @@ export type Project = {
   organizationId: string;
   documentIds: string[];
   memberIds: string[];
+  members?: OrganizationMember[];
   pendingRequests?: string[];
   requirementsListId: string;
   componentsListId: string;
@@ -48,6 +63,14 @@ export type InviteResponse = {
 
 export type OrganizationProjects = {
   organizationId: string;
+  organizationName?: string;
+  orgName?: string;
+  organization?: {
+    id?: string;
+    name?: string;
+  };
+  members?: OrganizationMember[];
+  organizationMembers?: OrganizationMember[];
   projects: Project[];
 };
 
@@ -61,7 +84,7 @@ export type Organization = {
 };
 
 type MockInvite = {
-  projectId: string;
+  organizationId: string;
   expiresAt: string;
 };
 
@@ -242,20 +265,22 @@ async function mockRequest<T = JsonValue>(
     return { status: 204, data: null };
   }
 
-  const inviteMatch = path.match(/^\/projects\/([^/]+)\/invites$/);
+  const inviteMatch = path.match(/^\/organizations\/([^/]+)\/invites$/);
   if (inviteMatch && method === 'POST') {
-    const projectId = inviteMatch[1];
-    const project = mockProjects.find((p) => p.id === projectId);
-    if (!project) {
+    const organizationId = inviteMatch[1];
+    const hasOrganizationProjects = mockProjects.some(
+      (p) => String(p.organizationId).toLowerCase() === organizationId.toLowerCase()
+    );
+    if (!hasOrganizationProjects) {
       return {
         status: 404,
-        data: { error: { code: 'PROJECT_NOT_FOUND', message: 'Project not found.' } },
+        data: { error: { code: 'ORGANIZATION_NOT_FOUND', message: 'Organization not found.' } },
       };
     }
 
     const token = createMockId('invite');
     const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
-    mockInvites.set(token, { projectId, expiresAt });
+    mockInvites.set(token, { organizationId, expiresAt });
     return {
       status: 200,
       data: {
@@ -267,7 +292,7 @@ async function mockRequest<T = JsonValue>(
   }
   
   // Projects 
-  if (path === '/projects/join' && method === 'POST') {
+  if (path === '/organizations/join' && method === 'POST') {
 
     const token = typeof body.token === 'string' ? body.token : '';
     const memberId = typeof body.memberId === 'string' ? body.memberId : '';
@@ -280,28 +305,45 @@ async function mockRequest<T = JsonValue>(
       };
     }
 
-    const index = mockProjects.findIndex((project) => project.id === invite.projectId);
-    if (index < 0) {
+    const matchingIndexes = mockProjects
+      .map((project, index) => ({ project, index }))
+      .filter(({ project }) =>
+        String(project.organizationId).toLowerCase() === String(invite.organizationId).toLowerCase()
+      );
+
+    if (matchingIndexes.length === 0) {
       return {
         status: 404,
-        data: { error: { code: 'PROJECT_NOT_FOUND', message: 'Project not found.' } },
+        data: { error: { code: 'ORGANIZATION_NOT_FOUND', message: 'Organization has no projects.' } },
       };
     }
 
-    const current = mockProjects[index];
-    const memberIds =
-      current.memberIds.includes(memberId) || !memberId
-        ? current.memberIds
-        : [...current.memberIds, memberId];
+    const joinedProjectIds: string[] = [];
+    mockProjects = mockProjects.map((project) => {
+      if (String(project.organizationId).toLowerCase() !== String(invite.organizationId).toLowerCase()) {
+        return project;
+      }
+      joinedProjectIds.push(project.id);
+      const memberIds =
+        project.memberIds.includes(memberId) || !memberId
+          ? project.memberIds
+          : [...project.memberIds, memberId];
 
-    const updated: Project = {
-      ...current,
-      memberIds,
-      updatedAt: now.toISOString(),
+      return {
+        ...project,
+        memberIds,
+        updatedAt: now.toISOString(),
+      };
+    });
+
+    return {
+      status: 200,
+      data: {
+        organizationId: invite.organizationId,
+        memberId,
+        joinedProjectIds,
+      } as T,
     };
-
-    mockProjects = mockProjects.map((project, i) => (i === index ? updated : project));
-    return { status: 200, data: updated as T };
   }
 
   const memberProjectsMatch = path.match(/^\/members\/([^/]+)\/organizations\/projects$/);
@@ -330,18 +372,34 @@ async function request<T = JsonValue>(
   if (USE_MOCK_REQUIREMENTS_API) {
     return mockRequest<T>(path, options);
   }
-  
-  const response = await fetch(`${PROJECTS_BASE_URL}${path}`, {
-    credentials: 'include',
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
-  });
 
-  const data = await readJson(response);
-  return { status: response.status, data: data as T };
+  try {
+    const response = await fetch(`${PROJECTS_BASE_URL}${path}`, {
+      credentials: 'include',
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+      },
+    });
+
+    const data = await readJson(response);
+    return { status: response.status, data: data as T };
+  } catch (error) {
+    if (SHOULD_FALLBACK_TO_MOCK_ON_LOCAL_FAILURE) {
+      console.warn('[projects api] requirements backend unreachable; falling back to mock API');
+      return mockRequest<T>(path, options);
+    }
+    return {
+      status: 0,
+      data: {
+        error: {
+          code: 'NETWORK_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to reach requirements API.',
+        },
+      },
+    };
+  }
 }
 
 export async function fetchProjects() {
@@ -356,6 +414,13 @@ export async function createProject(payload: Partial<Project>) {
 }
 
 export async function createOrganization(payload: { name: string; color?: string }) {
+  const primary = await request<Organization>('/organizations', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  if (primary.status !== 404) {
+    return primary;
+  }
   return request<Organization>('/organisations', {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -373,14 +438,14 @@ export async function deleteProject(id: string) {
   return request<null>(`/projects/${id}`, { method: 'DELETE' });
 }
 
-export async function createInvite(projectId: string) {
-  return request<InviteResponse>(`/projects/${projectId}/invites`, {
+export async function createOrganizationInvite(organizationId: string) {
+  return request<InviteResponse>(`/organizations/${organizationId}/invites`, {
     method: 'POST',
   });
 }
 
-export async function joinProject(token: string, memberId: string) {
-  return request<Project>('/projects/join', {
+export async function joinOrganization(token: string, memberId: string) {
+  return request<{ organizationId: string; memberId: string; joinedProjectIds: string[] }>('/organizations/join', {
     method: 'POST',
     body: JSON.stringify({ token, memberId }),
   });

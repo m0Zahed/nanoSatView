@@ -36,7 +36,7 @@ public record CreateInviteResponse(
     string? Link
 );
 
-public record ProjectJoinRequest(
+public record OrganisationJoinRequest(
     string Token,
     string MemberId
 );

@@ -2,6 +2,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ProjectManagement.Models;
 
+/// <summary>
+/// Per-organization index that tracks project ids belonging to one organization.
+/// </summary>
 public class OrganizationProjectIndex
 {
     [Key]

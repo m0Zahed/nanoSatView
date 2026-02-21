@@ -2,15 +2,17 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ProjectManagement.Models;
 
-public class ProjectInvite
+/// <summary>
+/// One-time/expiring invite token used to join an organization.
+/// </summary>
+public class OrganisationInvite
 {
     [Key]
     public Guid Id { get; set; } = Guid.NewGuid();
 
     [Required]
-    public Guid ProjectId { get; set; }
-
-    public Project? Project { get; set; }
+    [MaxLength(200)]
+    public string OrganizationId { get; set; } = string.Empty;
 
     [Required]
     [MaxLength(120)]

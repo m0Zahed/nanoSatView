@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ProjectManagement.Data;
@@ -12,9 +13,11 @@ using ProjectManagement.Data;
 namespace ProjectManagement.Migrations
 {
     [DbContext(typeof(RequirementsDbContext))]
-    partial class RequirementsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260221034725__PendingCheck")]
+    partial class _PendingCheck
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -79,39 +82,6 @@ namespace ProjectManagement.Migrations
                         .IsUnique();
 
                     b.ToTable("Organisations");
-                });
-
-            modelBuilder.Entity("ProjectManagement.Models.OrganisationInvite", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("OrganizationId")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<DateTime?>("RedeemedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Token")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Token")
-                        .IsUnique();
-
-                    b.ToTable("OrganisationInvites");
                 });
 
             modelBuilder.Entity("ProjectManagement.Models.OrganizationProjectIndex", b =>
@@ -203,6 +173,39 @@ namespace ProjectManagement.Migrations
                     b.ToTable("Projects");
                 });
 
+            modelBuilder.Entity("ProjectManagement.Models.ProjectInvite", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("RedeemedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.ToTable("ProjectInvites");
+                });
+
             modelBuilder.Entity("ProjectManagement.Models.Requirement", b =>
                 {
                     b.Property<Guid>("Id")
@@ -246,6 +249,17 @@ namespace ProjectManagement.Migrations
                     b.ToTable("Requirements");
                 });
 
+            modelBuilder.Entity("ProjectManagement.Models.ProjectInvite", b =>
+                {
+                    b.HasOne("ProjectManagement.Models.Project", "Project")
+                        .WithMany("Invites")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Project");
+                });
+
             modelBuilder.Entity("ProjectManagement.Models.Requirement", b =>
                 {
                     b.HasOne("ProjectManagement.Models.Project", "Project")
@@ -259,6 +273,8 @@ namespace ProjectManagement.Migrations
 
             modelBuilder.Entity("ProjectManagement.Models.Project", b =>
                 {
+                    b.Navigation("Invites");
+
                     b.Navigation("Requirements");
                 });
 #pragma warning restore 612, 618

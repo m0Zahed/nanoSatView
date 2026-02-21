@@ -2,6 +2,10 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ProjectManagement.Models;
 
+/// <summary>
+/// Project aggregate persisted for dashboard/project management flows.
+/// Linked to an organization by OrganizationId and to requirements by ProjectId.
+/// </summary>
 public class Project
 {
     [Key]
@@ -52,5 +56,4 @@ public class Project
 
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-    public ICollection<ProjectInvite> Invites { get; set; } = new List<ProjectInvite>();
 }

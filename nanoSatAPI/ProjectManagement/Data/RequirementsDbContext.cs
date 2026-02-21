@@ -12,7 +12,8 @@ public class RequirementsDbContext : DbContext
 
     public DbSet<Requirement> Requirements => Set<Requirement>();
     public DbSet<Project> Projects => Set<Project>();
-    public DbSet<ProjectInvite> ProjectInvites => Set<ProjectInvite>();
+    public DbSet<Organisation> Organisations => Set<Organisation>();
+    public DbSet<OrganisationInvite> OrganisationInvites => Set<OrganisationInvite>();
     public DbSet<MemberProjectIndex> MemberProjectIndexes => Set<MemberProjectIndex>();
     public DbSet<OrganizationProjectIndex> OrganizationProjectIndexes => Set<OrganizationProjectIndex>();
 
@@ -45,14 +46,19 @@ public class RequirementsDbContext : DbContext
                 .HasDefaultValueSql("NOW()");
         });
 
-        modelBuilder.Entity<ProjectInvite>(entity =>
+        modelBuilder.Entity<OrganisationInvite>(entity =>
         {
             entity.HasIndex(i => i.Token).IsUnique();
+            entity.Property(i => i.OrganizationId)
+                .HasMaxLength(200);
+        });
 
-            entity.HasOne(i => i.Project)
-                .WithMany(p => p.Invites)
-                .HasForeignKey(i => i.ProjectId)
-                .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<Organisation>(entity =>
+        {
+            entity.HasIndex(o => o.InviteLink).IsUnique();
+
+            entity.Property(o => o.CreatedAt)
+                .HasDefaultValueSql("NOW()");
         });
 
         modelBuilder.Entity<MemberProjectIndex>(entity =>
@@ -61,6 +67,9 @@ public class RequirementsDbContext : DbContext
 
             entity.Property(i => i.ProjectIds)
                 .HasColumnType("text[]");
+
+            entity.Property(i => i.ProjectRoles)
+                .HasColumnType("jsonb");
         });
 
         modelBuilder.Entity<OrganizationProjectIndex>(entity =>

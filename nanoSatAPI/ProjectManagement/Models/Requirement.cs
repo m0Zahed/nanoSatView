@@ -2,6 +2,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ProjectManagement.Models;
 
+/// <summary>
+/// Requirement record belonging to one project (ProjectId foreign key).
+/// </summary>
 public class Requirement
 {
     [Key]

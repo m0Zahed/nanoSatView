@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2, Check, X, Package, Search, FileText, Calendar, Layers, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
@@ -17,6 +17,7 @@ interface Component {
 interface ComponentsViewProps {
   projectName: string;
   components: string[];
+  requirements?: string[];
   onAddComponent: (component: string) => void;
   onRemoveComponent: (index: number) => void;
 }
@@ -24,6 +25,7 @@ interface ComponentsViewProps {
 export function ComponentsView({
   projectName,
   components,
+  requirements = [],
   onAddComponent,
   onRemoveComponent,
 }: ComponentsViewProps) {
@@ -40,6 +42,70 @@ export function ComponentsView({
   const [diagramQuery, setDiagramQuery] = useState('');
   const [docsQuery, setDocsQuery] = useState('');
   const [timelineQuery, setTimelineQuery] = useState('');
+
+  const parsedRequirements = useMemo(
+    () =>
+      requirements.map((raw, index) => {
+        try {
+          const parsed = JSON.parse(raw) as Partial<{
+            Id: string;
+            id: string;
+            Title: string;
+            title: string;
+            Description: string;
+            description: string;
+            Type: string;
+            type: string;
+            Subsystem: string;
+            subsystem: string;
+            Tags: string[];
+            tags: string[];
+          }>;
+          const title = (parsed.Title || parsed.title || '').toString().trim();
+          const description = (parsed.Description || parsed.description || '').toString().trim();
+          const type = (parsed.Type || parsed.type || '').toString().trim();
+          const subsystem = (parsed.Subsystem || parsed.subsystem || '').toString().trim();
+          const tags = Array.isArray(parsed.Tags || parsed.tags)
+            ? ((parsed.Tags || parsed.tags) as string[])
+            : [];
+          return {
+            id: (parsed.Id || parsed.id || `req-${index + 1}`).toString(),
+            title: title || raw,
+            description: description || raw,
+            type: type || 'General',
+            subsystem: subsystem || 'General',
+            tags,
+          };
+        } catch {
+          return {
+            id: `req-${index + 1}`,
+            title: raw,
+            description: raw,
+            type: 'General',
+            subsystem: 'General',
+            tags: [] as string[],
+          };
+        }
+      }),
+    [requirements]
+  );
+
+  const filteredRequirements = useMemo(() => {
+    const query = requirementsQuery.trim().toLowerCase();
+    if (!query) {
+      return parsedRequirements.slice(0, 6);
+    }
+    return parsedRequirements
+      .filter((req) =>
+        req.id.toLowerCase().includes(query) ||
+        req.title.toLowerCase().includes(query) ||
+        req.description.toLowerCase().includes(query) ||
+        req.type.toLowerCase().includes(query) ||
+        req.subsystem.toLowerCase().includes(query) ||
+        req.tags.some((tag) => tag.toLowerCase().includes(query))
+      )
+      .slice(0, 20);
+  }, [parsedRequirements, requirementsQuery]);
 
   // Parse components from strings
   const parsedComponents: Component[] = components.map((comp, index) => {
@@ -248,6 +314,27 @@ export function ComponentsView({
               />
               <div className="text-xs text-gray-400 font-mono">
                 Returns requirements linked to the selected component.
+              </div>
+              <div className="border border-white/10 bg-black/20 max-h-48 overflow-auto">
+                {filteredRequirements.length === 0 ? (
+                  <div className="p-3 text-xs text-gray-500 font-mono">No matching requirements</div>
+                ) : (
+                  filteredRequirements.map((requirement) => (
+                    <div
+                      key={requirement.id}
+                      className="p-3 border-b border-white/10 last:border-b-0 hover:bg-white/5"
+                    >
+                      <p className="text-xs text-gray-400 font-mono">{requirement.id}</p>
+                      <p className="text-sm text-white font-mono mt-1">{requirement.title}</p>
+                      <p className="text-xs text-gray-400 font-mono mt-1 line-clamp-2">
+                        {requirement.description}
+                      </p>
+                      <p className="text-[11px] text-gray-500 font-mono mt-1">
+                        {requirement.type} • {requirement.subsystem}
+                      </p>
+                    </div>
+                  ))
+                )}
               </div>
             </Card>
 

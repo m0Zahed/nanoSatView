@@ -931,6 +931,7 @@ export function Dashboard() {
             <ComponentsView
               projectName={selectedProject.name}
               components={selectedProject.components || []}
+              requirements={selectedProject.requirements || []}
               onAddComponent={handleAddComponentInView}
               onRemoveComponent={handleRemoveComponent}
             />

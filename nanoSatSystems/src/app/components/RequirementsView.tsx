@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Plus, Trash2, Check, X, Search } from 'lucide-react';
+import { Plus, Trash2, Check, X, Search, FileText, Upload } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Card } from '@/app/components/ui/card';
 import { ScrollArea } from '@/app/components/ui/scroll-area';
 import { Badge } from '@/app/components/ui/badge';
+import { Textarea } from '@/app/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -36,6 +37,17 @@ interface RequirementRow extends RequirementDraft {
   id: string;
   projectId: string;
   sourceIndex: number;
+}
+
+interface ValidationIssue {
+  row: number;
+  field: string;
+  message: string;
+}
+
+interface ValidationResult {
+  validRows: RequirementRow[];
+  issues: ValidationIssue[];
 }
 
 interface RequirementsViewProps {
@@ -110,6 +122,115 @@ function normalizeRequirement(
   };
 }
 
+function isGuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function toRequirementLevel(value: unknown): RequirementLevel | null {
+  const text = String(value ?? '').trim();
+  if (text === 'Must' || text === 'Should' || text === 'Could' || text === 'Won\'t') {
+    return text;
+  }
+  return null;
+}
+
+function validateGeneratedRequirements(
+  payload: string,
+  fallbackProjectId: string
+): ValidationResult {
+  const issues: ValidationIssue[] = [];
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(payload);
+  } catch {
+    return {
+      validRows: [],
+      issues: [{ row: 0, field: 'json', message: 'Invalid JSON. Expected an array of requirement objects.' }],
+    };
+  }
+
+  if (!Array.isArray(parsed)) {
+    return {
+      validRows: [],
+      issues: [{ row: 0, field: 'json', message: 'JSON root must be an array.' }],
+    };
+  }
+
+  const validRows: RequirementRow[] = [];
+
+  parsed.forEach((entry, index) => {
+    const rowNum = index + 1;
+    if (!entry || typeof entry !== 'object') {
+      issues.push({ row: rowNum, field: 'row', message: 'Each item must be an object.' });
+      return;
+    }
+
+    const obj = entry as Record<string, unknown>;
+    const id = String(obj.Id ?? obj.id ?? '').trim();
+    const title = String(obj.Title ?? obj.title ?? '').trim();
+    const description = String(obj.Description ?? obj.description ?? '').trim();
+    const type = String(obj.Type ?? obj.type ?? '').trim();
+    const levelRaw = obj.Level ?? obj.level;
+    const subsystem = String(obj.Subsystem ?? obj.subsystem ?? '').trim();
+    const tagsRaw = obj.Tags ?? obj.tags;
+    const projectId = String(obj.ProjectId ?? obj.projectId ?? fallbackProjectId).trim();
+
+    if (!id) issues.push({ row: rowNum, field: 'Id', message: 'Required.' });
+    else if (!isGuid(id)) issues.push({ row: rowNum, field: 'Id', message: 'Must be a valid GUID.' });
+
+    if (!title) issues.push({ row: rowNum, field: 'Title', message: 'Required.' });
+    else if (title.length > 200) issues.push({ row: rowNum, field: 'Title', message: 'Max length is 200.' });
+
+    if (!description) issues.push({ row: rowNum, field: 'Description', message: 'Required.' });
+    else if (description.length > 4000)
+      issues.push({ row: rowNum, field: 'Description', message: 'Max length is 4000.' });
+
+    if (!type) issues.push({ row: rowNum, field: 'Type', message: 'Required.' });
+    else if (type.length > 100) issues.push({ row: rowNum, field: 'Type', message: 'Max length is 100.' });
+
+    const level = toRequirementLevel(levelRaw);
+    if (!level) {
+      issues.push({
+        row: rowNum,
+        field: 'Level',
+        message: "Required. Must be one of: Must, Should, Could, Won't.",
+      });
+    }
+
+    if (!subsystem) issues.push({ row: rowNum, field: 'Subsystem', message: 'Required.' });
+    else if (subsystem.length > 200)
+      issues.push({ row: rowNum, field: 'Subsystem', message: 'Max length is 200.' });
+
+    if (!Array.isArray(tagsRaw)) {
+      issues.push({ row: rowNum, field: 'Tags', message: 'Required. Must be an array of strings.' });
+    } else if (!(tagsRaw as unknown[]).every((tag) => typeof tag === 'string')) {
+      issues.push({ row: rowNum, field: 'Tags', message: 'All tags must be strings.' });
+    }
+
+    if (!projectId) issues.push({ row: rowNum, field: 'ProjectId', message: 'Required.' });
+    else if (!isGuid(projectId))
+      issues.push({ row: rowNum, field: 'ProjectId', message: 'Must be a valid GUID.' });
+
+    const rowIssues = issues.filter((issue) => issue.row === rowNum);
+    if (rowIssues.length === 0) {
+      validRows.push({
+        id,
+        title,
+        description,
+        type,
+        level: level as RequirementLevel,
+        subsystem,
+        tags: tagsRaw as string[],
+        projectId,
+        sourceIndex: index,
+      });
+    }
+  });
+
+  return { validRows, issues };
+}
+
 export function RequirementsView({
   projectName,
   projectId,
@@ -131,6 +252,9 @@ export function RequirementsView({
   const [levelFilter, setLevelFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [subsystemFilter, setSubsystemFilter] = useState<string>('all');
+  const [generatorFiles, setGeneratorFiles] = useState<File[]>([]);
+  const [generatedJsonInput, setGeneratedJsonInput] = useState('');
+  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
 
   const normalizedRequirements = useMemo(
     () =>
@@ -203,6 +327,35 @@ export function RequirementsView({
       setTagsInput('');
       setIsAdding(false);
     }
+  };
+
+  const handleValidateGeneratedJson = () => {
+    const result = validateGeneratedRequirements(
+      generatedJsonInput,
+      projectId || '00000000-0000-0000-0000-000000000000'
+    );
+    setValidationResult(result);
+  };
+
+  const handleImportValidRows = () => {
+    if (!validationResult || validationResult.validRows.length === 0) {
+      return;
+    }
+    for (const row of validationResult.validRows) {
+      const payload = {
+        Id: row.id,
+        Title: row.title,
+        Description: row.description,
+        Type: row.type,
+        Level: row.level,
+        Subsystem: row.subsystem,
+        Tags: row.tags,
+        ProjectId: row.projectId,
+      };
+      onAddRequirement(JSON.stringify(payload));
+    }
+    setGeneratedJsonInput('');
+    setValidationResult(null);
   };
 
   return (
@@ -345,6 +498,88 @@ export function RequirementsView({
               </div>
             </Card>
           )}
+
+          <Card className="p-4 bg-[#222222] border-white/10 rounded-none space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base text-white font-mono">Generate Requirements From Doc</h3>
+                <p className="text-xs text-gray-400 font-mono">
+                  Upload source docs, paste AI-generated JSON array, then validate against table fields.
+                </p>
+              </div>
+              <Badge variant="secondary" className="rounded-none">Draft</Badge>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs text-gray-300 font-mono flex items-center gap-2">
+                <Upload className="h-3.5 w-3.5" />
+                Documents
+              </label>
+              <Input
+                type="file"
+                multiple
+                onChange={(e) => setGeneratorFiles(Array.from(e.target.files || []))}
+                className="bg-[#1a1a1a] border-white/10 text-white rounded-none font-mono file:mr-3 file:border-0 file:bg-white file:text-black file:px-2 file:py-1"
+              />
+              {generatorFiles.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {generatorFiles.map((file) => (
+                    <Badge key={file.name} variant="secondary" className="rounded-none">
+                      <FileText className="h-3 w-3 mr-1" />
+                      {file.name}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs text-gray-300 font-mono">Generated Requirements JSON</label>
+              <Textarea
+                value={generatedJsonInput}
+                onChange={(e) => setGeneratedJsonInput(e.target.value)}
+                placeholder='[{"Id":"...","Title":"...","Description":"...","Type":"...","Level":"Should","Subsystem":"...","Tags":["..."],"ProjectId":"..."}]'
+                className="min-h-40 bg-[#1a1a1a] border-white/10 text-white rounded-none font-mono"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                onClick={handleValidateGeneratedJson}
+                className="bg-white text-black hover:bg-gray-200 rounded-none font-mono"
+              >
+                Validate JSON
+              </Button>
+              <Button
+                onClick={handleImportValidRows}
+                variant="outline"
+                className="border-white/10 text-gray-200 hover:bg-white/5 rounded-none font-mono"
+                disabled={!validationResult || validationResult.validRows.length === 0}
+              >
+                Import Valid Rows
+              </Button>
+            </div>
+
+            {validationResult && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs font-mono">
+                  <Badge className="rounded-none">{validationResult.validRows.length} valid</Badge>
+                  <Badge variant="destructive" className="rounded-none">
+                    {validationResult.issues.length} issues
+                  </Badge>
+                </div>
+                {validationResult.issues.length > 0 && (
+                  <div className="max-h-36 overflow-auto border border-red-400/30 bg-red-500/5 p-2 space-y-1">
+                    {validationResult.issues.map((issue, idx) => (
+                      <p key={`${issue.row}-${issue.field}-${idx}`} className="text-xs text-red-300 font-mono">
+                        Row {issue.row} / {issue.field}: {issue.message}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
 
           <Card className="p-4 bg-[#222222] border-white/10 rounded-none">
             <div className="grid gap-3 md:grid-cols-4">

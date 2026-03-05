@@ -20,4 +20,12 @@ public class KafkaConfig {
             .replicas(1)
             .build();
     }
+
+    @Bean
+    public NewTopic diagramSavedTopic(@Value("${app.kafka.topic.diagram-saved}") String topicName) {
+        return TopicBuilder.name(topicName)
+            .partitions(1)
+            .replicas(1)
+            .build();
+    }
 }

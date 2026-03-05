@@ -8,24 +8,24 @@ import org.springframework.stereotype.Service;
 
 @Service
 @ConditionalOnProperty(name = "app.kafka.enabled", havingValue = "true")
-public class KafkaUserEventPublisher {
+public class DiagramKafkaEventPublisher {
 
-    private final KafkaTemplate<String, KafkaUserCreatedEvent> kafkaTemplate;
-    private final String userCreatedTopic;
+    private final KafkaTemplate<String, DiagramSavedKafkaEvent> kafkaTemplate;
+    private final String topicName;
     private final MonitoringStateService monitoringStateService;
 
-    public KafkaUserEventPublisher(
-        KafkaTemplate<String, KafkaUserCreatedEvent> kafkaTemplate,
-        @Value("${app.kafka.topic.user-created}") String userCreatedTopic,
+    public DiagramKafkaEventPublisher(
+        KafkaTemplate<String, DiagramSavedKafkaEvent> kafkaTemplate,
+        @Value("${app.kafka.topic.diagram-saved}") String topicName,
         MonitoringStateService monitoringStateService
     ) {
         this.kafkaTemplate = kafkaTemplate;
-        this.userCreatedTopic = userCreatedTopic;
+        this.topicName = topicName;
         this.monitoringStateService = monitoringStateService;
     }
 
-    public void publish(KafkaUserCreatedEvent event) {
-        kafkaTemplate.send(userCreatedTopic, event.username(), event);
-        monitoringStateService.recordKafkaProduced(userCreatedTopic);
+    public void publish(DiagramSavedKafkaEvent event) {
+        kafkaTemplate.send(topicName, event.projectId(), event);
+        monitoringStateService.recordKafkaProduced(topicName);
     }
 }

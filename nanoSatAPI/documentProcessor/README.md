@@ -1,20 +1,57 @@
-# Basic Spring Boot Event Demo (Spring + Kafka)
+# Spring Boot Diagram Event Processor
 
-This project demonstrates two pub-sub styles:
-- Spring in-process events (`ApplicationEventPublisher` + `@EventListener`) - always on
-- Kafka events (`KafkaTemplate` + `@KafkaListener`) - optional
+This service now supports:
+- In-process Spring events (learning/demo)
+- Optional Kafka pub-sub
+- Diagram save ingestion for Operational Flow with DB persistence
 
-## Flow overview
+## Diagram schema persisted in DB
 
-1. Call `GET /users/create?username=bob`.
-2. `UserService` publishes:
-   - `UserCreatedEvent` (in-process Spring event)
-   - `KafkaUserCreatedEvent` (to Kafka topic, only if Kafka is enabled)
-3. Two listeners react independently:
-   - `UserEventListener` for Spring event
-   - `KafkaUserEventListener` for Kafka topic event (only if Kafka is enabled)
+Table: `project_management_diagrams`
 
-## Run without Docker (default)
+Columns:
+- `event_time`
+- `id_of_last_member_who_edited`
+- `project_id`
+- `diagram_id`
+- `diagram_name`
+- `diagram_description`
+- `filepath_local`
+
+## Diagram save endpoint
+
+`POST /api/diagrams/save`
+
+Request body:
+
+```json
+{
+  "projectId": "project-guid-or-id",
+  "memberId": "member-id",
+  "diagramName": "Operational Flow v1",
+  "diagramDescription": "Main mission workflow",
+  "xmlContent": "<?xml version=\"1.0\" ... >...</xml>"
+}
+```
+
+Success response:
+
+```json
+{
+  "success": true,
+  "message": "Diagram saved successfully.",
+  "diagramId": "uuid",
+  "time": "2026-02-25T...",
+  "filePath": "..."
+}
+```
+
+## Useful read endpoints
+
+- `GET /api/diagrams/project/{projectId}`
+- `GET /api/diagrams/{diagramId}`
+
+## Run (no Docker required)
 
 ```powershell
 $env:JAVA_HOME='D:\Program Files\Java'
@@ -22,47 +59,15 @@ $env:Path="$env:JAVA_HOME\bin;$env:Path"
 mvn spring-boot:run
 ```
 
-In this mode, `app.kafka.enabled=false` so only Spring in-process pub-sub is active.
+Default DB is local H2 file storage (`./data/project-management`) and XML files are stored under `./data/diagrams`.
 
-## Optional: run with Kafka (no Docker)
+## Optional Kafka mode
 
-If you already have Kafka running locally on `localhost:9092`, enable Kafka like this:
+If you already have Kafka running on `localhost:9092`:
 
 ```powershell
-$env:JAVA_HOME='D:\Program Files\Java'
-$env:Path="$env:JAVA_HOME\bin;$env:Path"
 mvn spring-boot:run "-Dspring-boot.run.arguments=--app.kafka.enabled=true"
 ```
 
-If you prefer, you can also edit `application.properties` and set:
-
-```properties
-app.kafka.enabled=true
-```
-
-## Trigger event
-
-```text
-http://localhost:8080/users/create?username=bob
-```
-
-Expected logs:
-- Always: Spring listener log from `UserEventListener`
-- If enabled: Kafka listener log from `KafkaUserEventListener`
-
-## Key settings
-
-See `src/main/resources/application.properties`:
-- `app.kafka.enabled=false` (default)
-- `spring.kafka.bootstrap-servers=localhost:9092`
-- `app.kafka.topic.user-created=user-created-topic`
-- JSON serializer/deserializer setup for `KafkaUserCreatedEvent`
-
-## Docker option (if needed later)
-
-You can still use Docker with:
-
-```powershell
-docker compose up -d
-mvn spring-boot:run
-```
+When enabled, successful diagram saves also publish to topic:
+- `app.kafka.topic.diagram-saved=diagram-saved-topic`

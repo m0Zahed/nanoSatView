@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NanoSat API Live Monitor</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+    :root {
+      --bg0: #0f1725;
+      --bg1: #16243f;
+      --card: rgba(16, 23, 38, 0.82);
+      --card-border: rgba(157, 188, 255, 0.2);
+      --text: #e8f2ff;
+      --muted: #9ab2d6;
+      --accent: #2dd4bf;
+      --accent-2: #f59e0b;
+      --danger: #fb7185;
+      --ok: #22c55e;
+      --shadow: 0 18px 60px rgba(0, 0, 0, 0.42);
+      --radius: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Space Grotesk", "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 12% 10%, rgba(45, 212, 191, 0.16), transparent 36%),
+        radial-gradient(circle at 88% 16%, rgba(245, 158, 11, 0.2), transparent 33%),
+        linear-gradient(135deg, var(--bg0), var(--bg1));
+      padding: 22px;
+    }
+
+    .layout {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: grid;
+      gap: 16px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 18px;
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      background: var(--card);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+    }
+
+    .title {
+      font-size: clamp(1.2rem, 1rem + 1vw, 2rem);
+      margin: 0;
+      letter-spacing: 0.02em;
+    }
+
+    .meta {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      font-size: 0.92rem;
+      color: var(--muted);
+    }
+
+    .pulse {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--ok);
+      box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+      animation: pulse 1.8s infinite;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+      70% { box-shadow: 0 0 0 12px rgba(34, 197, 94, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    }
+
+    .cards {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    }
+
+    .card {
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      background: var(--card);
+      box-shadow: var(--shadow);
+      padding: 14px;
+    }
+
+    .label {
+      color: var(--muted);
+      font-size: 0.84rem;
+      margin-bottom: 6px;
+    }
+
+    .value {
+      font-family: "JetBrains Mono", monospace;
+      font-weight: 600;
+      font-size: 1.25rem;
+    }
+
+    .grid-2 {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: 1fr;
+    }
+
+    @media (min-width: 1080px) {
+      .grid-2 {
+        grid-template-columns: 1.1fr 0.9fr;
+      }
+    }
+
+    .section-title {
+      margin: 0 0 10px;
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border-radius: 12px;
+      border: 1px solid rgba(154, 178, 214, 0.2);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 600px;
+      font-size: 0.86rem;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 9px 10px;
+      border-bottom: 1px solid rgba(154, 178, 214, 0.16);
+      vertical-align: top;
+    }
+
+    th {
+      color: #c6dcff;
+      font-weight: 600;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    code, .mono {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.82rem;
+      color: #d8e8ff;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+
+    .badge-ok {
+      color: #a7f3d0;
+      border-color: rgba(34, 197, 94, 0.5);
+      background: rgba(34, 197, 94, 0.12);
+    }
+
+    .badge-off {
+      color: #fecaca;
+      border-color: rgba(251, 113, 133, 0.5);
+      background: rgba(251, 113, 133, 0.14);
+    }
+
+    .small {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .error {
+      color: #ffd7d7;
+      background: rgba(251, 113, 133, 0.17);
+      border: 1px solid rgba(251, 113, 133, 0.45);
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 0.88rem;
+    }
+  </style>
+</head>
+<body>
+  <main class="layout">
+    <header class="topbar">
+      <h1 class="title">NanoSat API Live Monitor</h1>
+      <div class="meta">
+        <div class="pulse" aria-hidden="true"></div>
+        <span id="updatedAt">Waiting for data...</span>
+      </div>
+    </header>
+
+    <section class="cards">
+      <article class="card">
+        <div class="label">Uptime</div>
+        <div class="value" id="uptime">0s</div>
+      </article>
+      <article class="card">
+        <div class="label">Kafka</div>
+        <div class="value" id="kafkaStatus">Unknown</div>
+      </article>
+      <article class="card">
+        <div class="label">API Endpoints</div>
+        <div class="value" id="endpointCount">0</div>
+      </article>
+      <article class="card">
+        <div class="label">Schema Models</div>
+        <div class="value" id="schemaCount">0</div>
+      </article>
+      <article class="card">
+        <div class="label">Stored Diagrams</div>
+        <div class="value" id="diagramCount">0</div>
+      </article>
+      <article class="card">
+        <div class="label">Recent Requests</div>
+        <div class="value" id="requestCount">0</div>
+      </article>
+    </section>
+
+    <section class="grid-2">
+      <article class="card">
+        <h2 class="section-title">Kafka Flow</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Topic</th>
+                <th>Produced</th>
+                <th>Consumed</th>
+                <th>Last Event</th>
+              </tr>
+            </thead>
+            <tbody id="kafkaTable"></tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2 class="section-title">Diagram Storage</h2>
+        <p class="small">Root: <span class="mono" id="storageRoot">-</span></p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>File</th>
+                <th>Size</th>
+                <th>Last Modified</th>
+              </tr>
+            </thead>
+            <tbody id="diagramTable"></tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <section class="grid-2">
+      <article class="card">
+        <h2 class="section-title">Spring Boot Endpoints</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Path</th>
+                <th>Methods</th>
+                <th>Handler</th>
+              </tr>
+            </thead>
+            <tbody id="endpointTable"></tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2 class="section-title">Schema Catalog</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>Fields</th>
+              </tr>
+            </thead>
+            <tbody id="schemaTable"></tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <section class="card">
+      <h2 class="section-title">Requests Received (Frontend + API Traffic)</h2>
+      <div id="errorBox"></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Method</th>
+              <th>Path</th>
+              <th>Status</th>
+              <th>Latency</th>
+              <th>Source</th>
+              <th>Origin</th>
+              <th>Body Preview</th>
+            </tr>
+          </thead>
+          <tbody id="requestTable"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    const fmtTime = (value) => {
+      if (!value) return "-";
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return String(value);
+      return d.toLocaleString();
+    };
+
+    const fmtAge = (seconds) => {
+      const s = Number(seconds || 0);
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const rem = s % 60;
+      return `${h}h ${m}m ${rem}s`;
+    };
+
+    const fmtBytes = (bytes) => {
+      const n = Number(bytes);
+      if (!Number.isFinite(n) || n < 0) return "-";
+      if (n < 1024) return `${n} B`;
+      if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+      return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+    };
+
+    const esc = (value) => String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;");
+
+    function render(data) {
+      $("updatedAt").textContent = `Updated ${new Date().toLocaleTimeString()}`;
+      $("uptime").textContent = fmtAge(data.uptimeSeconds);
+      $("kafkaStatus").innerHTML = data.kafkaEnabled
+        ? `<span class="badge badge-ok">Enabled</span>`
+        : `<span class="badge badge-off">Disabled</span>`;
+      $("endpointCount").textContent = data.endpoints.length;
+      $("schemaCount").textContent = data.schemas.length;
+      $("diagramCount").textContent = data.diagramStorage.totalFiles;
+      $("requestCount").textContent = data.recentRequests.length;
+      $("storageRoot").textContent = data.diagramStorage.rootPath;
+
+      $("kafkaTable").innerHTML = (data.kafkaFlows.length ? data.kafkaFlows : [{ topic: "(no topic activity yet)", produced: 0, consumed: 0 }])
+        .map(row => `
+          <tr>
+            <td class="mono">${esc(row.topic)}</td>
+            <td>${esc(row.produced)}</td>
+            <td>${esc(row.consumed)}</td>
+            <td>${esc(fmtTime(row.lastEventAt))}</td>
+          </tr>
+        `).join("");
+
+      $("diagramTable").innerHTML = data.diagramStorage.recentFiles.map(file => `
+        <tr>
+          <td class="mono">${esc(file.relativePath)}</td>
+          <td>${esc(fmtBytes(file.sizeBytes))}</td>
+          <td>${esc(fmtTime(file.lastModifiedAt))}</td>
+        </tr>
+      `).join("") || `<tr><td colspan="3" class="small">No files found</td></tr>`;
+
+      $("endpointTable").innerHTML = data.endpoints.map(ep => `
+        <tr>
+          <td class="mono">${esc(ep.path)}</td>
+          <td>${esc(ep.methods.join(", "))}</td>
+          <td class="small">${esc(ep.handler)}</td>
+        </tr>
+      `).join("");
+
+      $("schemaTable").innerHTML = data.schemas.map(schema => {
+        const fieldLines = schema.fields.map(f => {
+          const annotations = f.annotations.length ? ` <span class="small">(${esc(f.annotations.join(" "))})</span>` : "";
+          return `<div><span class="mono">${esc(f.name)}</span>: ${esc(f.type)}${annotations}</div>`;
+        }).join("");
+        return `
+          <tr>
+            <td class="mono">${esc(schema.name)}</td>
+            <td>${fieldLines || "<span class='small'>No fields</span>"}</td>
+          </tr>
+        `;
+      }).join("");
+
+      $("requestTable").innerHTML = data.recentRequests.map(req => `
+        <tr>
+          <td>${esc(fmtTime(req.timestamp))}</td>
+          <td><span class="mono">${esc(req.method)}</span></td>
+          <td class="mono">${esc(req.path)}${req.query ? `?${esc(req.query)}` : ""}</td>
+          <td>${esc(req.status)}</td>
+          <td>${esc(req.durationMs)} ms</td>
+          <td>${esc(req.source)}</td>
+          <td class="small">${esc(req.origin || req.referer || "-")}</td>
+          <td class="small">${esc(req.bodyPreview || "-")}</td>
+        </tr>
+      `).join("") || `<tr><td colspan="8" class="small">No request traffic yet</td></tr>`;
+    }
+
+    async function refresh() {
+      try {
+        $("errorBox").innerHTML = "";
+        const response = await fetch("/api/monitoring/snapshot", { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error(`Snapshot request failed with status ${response.status}`);
+        }
+        const data = await response.json();
+        render(data);
+      } catch (error) {
+        $("errorBox").innerHTML = `<div class="error">${esc(error.message)}</div>`;
+      }
+    }
+
+    refresh();
+    setInterval(refresh, 2000);
+  </script>
+</body>
+</html>

@@ -32,6 +32,7 @@ import {
   Pencil,
   ChevronDown,
   ChevronUp,
+  Cpu,
 } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/app/components/ui/dialog';
@@ -1108,6 +1109,27 @@ export function OperationalFlow({ projectId, projectName }: OperationalFlowProps
     ? generatedDiagrams.find((d) => d.id === editingDiagramId) || null
     : null;
 
+  const selectedEditingDiagramPayload = useMemo(() => {
+    if (!selectedEditingDiagram) {
+      return null;
+    }
+    const payloadObject = {
+      version: 1,
+      projectId: projectId || '',
+      projectName: projectName || '',
+      latestDiagram: selectedEditingDiagram,
+      generatedDiagrams,
+    };
+    const jsonContent = JSON.stringify(payloadObject, null, 2);
+    const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>\n<operationalFlowDiagramSave version="1">\n  <payload><![CDATA[${toCDataSafe(JSON.stringify(payloadObject))}]]></payload>\n</operationalFlowDiagramSave>\n`;
+    return { jsonContent, xmlContent };
+  }, [generatedDiagrams, projectId, projectName, selectedEditingDiagram]);
+
+  const handleDiagramGptIntegration = useCallback(() => {
+    // Placeholder hook for future DiagramGPT integration.
+    console.info('DiagramGPT integration is not implemented yet.');
+  }, []);
+
   useEffect(() => {
     if (!isDiagramManagerOpen) {
       return;
@@ -1630,15 +1652,26 @@ export function OperationalFlow({ projectId, projectName }: OperationalFlowProps
 
       {/* Diagram Edit Dialog */}
       <Dialog open={isEditDiagramDialogOpen} onOpenChange={setIsEditDiagramDialogOpen}>
-        <DialogContent className="max-w-2xl bg-[#1a1a1a] border-white/10 rounded-none">
+        <DialogContent className="!fixed !left-1/2 !top-[45vh] !z-[10000] w-[min(96vw,1280px)] max-w-none max-h-[88vh] -translate-x-1/2 -translate-y-1/2 overflow-y-auto bg-[#1a1a1a] border-white/10 rounded-none">
           <DialogHeader>
             <DialogTitle className="text-white font-mono">Diagram Details</DialogTitle>
             <DialogDescription className="text-gray-400 font-mono">
-              Edit title/description and review latest edits.
+              Edit title/description, view read-only JSON/XML files, and trigger DiagramGPT.
             </DialogDescription>
           </DialogHeader>
           {selectedEditingDiagram && (
             <div className="space-y-4">
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleDiagramGptIntegration}
+                  className="rounded-none border-white/10 text-black hover:text-white hover:bg-white/5 font-mono gap-2"
+                >
+                  <Cpu className="h-4 w-4" />
+                  DiagramGPT
+                </Button>
+              </div>
               <div className="space-y-2">
                 <Label className="text-xs text-gray-400 font-mono">Title</Label>
                 <Input
@@ -1696,6 +1729,22 @@ export function OperationalFlow({ projectId, projectName }: OperationalFlowProps
                       </p>
                     ))
                   )}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-gray-400 font-mono">JSON File (Read-only)</Label>
+                <div className="max-h-64 overflow-auto border border-white/10 bg-[#222222] p-3">
+                  <pre className="text-xs text-gray-300 font-mono whitespace-pre-wrap break-words">
+                    {selectedEditingDiagramPayload?.jsonContent || 'No JSON payload available.'}
+                  </pre>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-gray-400 font-mono">XML File (Read-only)</Label>
+                <div className="max-h-64 overflow-auto border border-white/10 bg-[#222222] p-3">
+                  <pre className="text-xs text-gray-300 font-mono whitespace-pre-wrap break-words">
+                    {selectedEditingDiagramPayload?.xmlContent || 'No XML payload available.'}
+                  </pre>
                 </div>
               </div>
             </div>

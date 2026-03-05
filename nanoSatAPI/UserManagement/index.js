@@ -8,6 +8,9 @@ const { db } = require('./db');
 const { generateRawToken, hashToken, expiresInHours, nowIso } = require('./token');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('./email');
 const crypto = require('crypto');
+const pino = require('pino');
+const pinoHttp = require('pino-http');
+const { blue, cyan, dim, green, magenta, red, yellow } = require('colorette');
 
 const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 5000;
@@ -33,10 +36,36 @@ const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5000/auth/google/callback';
 const SESSION_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7;
 const ADMIN_EMAIL = 'zahedmohammedwork@gmail.com';
+const VERBOSE_HTTP_LOGS = (process.env.VERBOSE_HTTP_LOGS || 'true').toLowerCase() === 'true';
+const PRETTY_HTTP_LOGS = (process.env.PRETTY_HTTP_LOGS || 'true').toLowerCase() === 'true';
+const LOG_LEVEL = process.env.LOG_LEVEL || 'info';
+const CORS_ALLOW_ALL = (process.env.CORS_ALLOW_ALL || 'false').toLowerCase() === 'true';
 
-const allowedOrigins = new Set(
-  CLIENT_ORIGINS.flatMap((o) => [o, `${o}/`])
-);
+function buildAllowedOrigins(origins) {
+  const set = new Set();
+  for (const origin of origins) {
+    const normalized = origin.replace(/\/+$/, '');
+    if (!normalized) {
+      continue;
+    }
+    set.add(normalized);
+    set.add(`${normalized}/`);
+
+    try {
+      const parsed = new URL(normalized);
+      const host = parsed.hostname;
+      const altHost = host.startsWith('www.') ? host.slice(4) : `www.${host}`;
+      const altOrigin = `${parsed.protocol}//${altHost}${parsed.port ? `:${parsed.port}` : ''}`;
+      set.add(altOrigin);
+      set.add(`${altOrigin}/`);
+    } catch (_error) {
+      // ignore invalid URLs in env; normalized origin is still kept
+    }
+  }
+  return set;
+}
+
+const allowedOrigins = buildAllowedOrigins(CLIENT_ORIGINS);
 
 app.use(
   cors({
@@ -44,19 +73,171 @@ app.use(
   origin: (requestOrigin, callback) => {
     // Allow same-origin requests (e.g., curl, mobile) with no Origin header
     if (!requestOrigin) return callback(null, true);
+    if (CORS_ALLOW_ALL) return callback(null, true);
 
     const normalized = requestOrigin.replace(/\/+$/, '');
     if (allowedOrigins.has(normalized)) {
       // mirror the exact origin back so the browser accepts it with credentials
       return callback(null, true);
     }
-    console.warn('[cors] blocked origin', requestOrigin);
+    console.warn('[cors] blocked origin', {
+      requestOrigin,
+      normalized,
+      allowedOrigins: Array.from(allowedOrigins),
+    });
     return callback(new Error('Not allowed by CORS'));
   },
   })
 );
 app.use(express.json());
 app.use(cookieParser());
+
+function isPlainObject(value) {
+  return Object.prototype.toString.call(value) === '[object Object]';
+}
+
+function sanitizeForLog(value, keyHint = '') {
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    if (value.length > 500) {
+      return `${value.slice(0, 500)}...[truncated:${value.length}]`;
+    }
+    return value;
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return value;
+  }
+
+  const normalizedKey = String(keyHint || '').toLowerCase();
+  if (
+    normalizedKey.includes('password') ||
+    normalizedKey.includes('token') ||
+    normalizedKey.includes('secret') ||
+    normalizedKey.includes('cookie') ||
+    normalizedKey.includes('authorization')
+  ) {
+    return '[REDACTED]';
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeForLog(item, keyHint));
+  }
+
+  if (isPlainObject(value)) {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) {
+      out[k] = sanitizeForLog(v, k);
+    }
+    return out;
+  }
+
+  return String(value);
+}
+
+function getStatusStyle(statusCode) {
+  if (statusCode >= 500) return red;
+  if (statusCode >= 400) return yellow;
+  if (statusCode >= 300) return magenta;
+  return green;
+}
+
+const loggerTransport = PRETTY_HTTP_LOGS
+  ? pino.transport({
+      target: 'pino-pretty',
+      options: {
+        colorize: true,
+        translateTime: 'SYS:yyyy-mm-dd HH:MM:ss.l',
+        ignore: 'pid,hostname',
+        singleLine: false,
+      },
+    })
+  : undefined;
+
+const logger = pino(
+  {
+    level: LOG_LEVEL,
+    base: undefined,
+  },
+  loggerTransport
+);
+
+const requestLogger = pinoHttp({
+  logger,
+  autoLogging: false,
+  genReqId: () => crypto.randomUUID().slice(0, 8),
+});
+
+if (VERBOSE_HTTP_LOGS) {
+  app.use(requestLogger);
+
+  app.use((req, res, next) => {
+    const start = Date.now();
+    const requestId = req.id || crypto.randomUUID().slice(0, 8);
+    let responseBodyForLog;
+    let responseCaptured = false;
+
+    const originalJson = res.json.bind(res);
+    res.json = (body) => {
+      responseBodyForLog = body;
+      responseCaptured = true;
+      return originalJson(body);
+    };
+
+    const originalSend = res.send.bind(res);
+    res.send = (body) => {
+      if (!responseCaptured) {
+        responseBodyForLog = body;
+      }
+      return originalSend(body);
+    };
+
+    req.log.info(
+      {
+        event: 'http.request',
+        request: {
+          id: requestId,
+          method: req.method,
+          path: req.originalUrl,
+          ip: req.ip,
+          at: new Date().toISOString(),
+          origin: req.headers.origin || null,
+          userAgent: req.headers['user-agent'] || null,
+          headers: sanitizeForLog(req.headers),
+          query: sanitizeForLog(req.query),
+          body: sanitizeForLog(req.body),
+        },
+      },
+      `${cyan('>> REQUEST')} ${blue(req.method)} ${req.originalUrl} ${dim(`#${requestId}`)}`
+    );
+
+    res.on('finish', () => {
+      const durationMs = Date.now() - start;
+      const statusStyled = getStatusStyle(res.statusCode)(String(res.statusCode));
+      req.log.info(
+        {
+          event: 'http.response',
+          response: {
+            id: requestId,
+            method: req.method,
+            path: req.originalUrl,
+            status: res.statusCode,
+            durationMs,
+            at: new Date().toISOString(),
+            headers: sanitizeForLog(typeof res.getHeaders === 'function' ? res.getHeaders() : {}),
+            body: sanitizeForLog(responseBodyForLog),
+          },
+        },
+        `${cyan('<< RESPONSE')} ${blue(req.method)} ${req.originalUrl} -> ${statusStyled} ${dim(`(${durationMs}ms) #${requestId}`)}`
+      );
+    });
+
+    next();
+  });
+}
 
 const oauthClient = new OAuth2Client({
   clientId: GOOGLE_CLIENT_ID,
@@ -255,18 +436,30 @@ function hashPassword(password) {
 
 function verifyPassword(password, passwordHash) {
   if (!passwordHash) {
-    return false;
+    return { ok: false, reason: 'NO_PASSWORD_HASH' };
   }
   const [prefix, iterationsValue, salt, hash] = passwordHash.split('$');
   if (prefix !== 'pbkdf2' || !iterationsValue || !salt || !hash) {
-    return false;
+    return { ok: false, reason: 'UNSUPPORTED_HASH_FORMAT' };
   }
   const iterations = Number(iterationsValue);
   if (!Number.isFinite(iterations)) {
-    return false;
+    return { ok: false, reason: 'INVALID_HASH_ITERATIONS' };
   }
-  const derived = crypto.pbkdf2Sync(password, salt, iterations, 32, 'sha256').toString('hex');
-  return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(derived, 'hex'));
+  try {
+    const derived = crypto.pbkdf2Sync(password, salt, iterations, 32, 'sha256').toString('hex');
+    const expected = Buffer.from(hash, 'hex');
+    const actual = Buffer.from(derived, 'hex');
+    if (expected.length !== actual.length) {
+      return { ok: false, reason: 'HASH_LENGTH_MISMATCH' };
+    }
+    return {
+      ok: crypto.timingSafeEqual(expected, actual),
+      reason: 'PASSWORD_MISMATCH',
+    };
+  } catch (_error) {
+    return { ok: false, reason: 'HASH_VERIFY_ERROR' };
+  }
 }
 
 function getUserFromRequest(req) {
@@ -402,6 +595,12 @@ app.post('/auth/login', (req, res) => {
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
 
   if (!email || !password) {
+    if (VERBOSE_HTTP_LOGS) {
+      console.warn('[auth/login] missing credentials', {
+        emailPresent: Boolean(email),
+        passwordPresent: Boolean(password),
+      });
+    }
     return res.status(400).json({
       error: {
         code: 'MISSING_CREDENTIALS',
@@ -412,6 +611,12 @@ app.post('/auth/login', (req, res) => {
 
   const user = findUserByEmail(email);
   if (!user || !user.passwordHash) {
+    if (VERBOSE_HTTP_LOGS) {
+      console.warn('[auth/login] invalid credentials', {
+        email,
+        reason: !user ? 'USER_NOT_FOUND' : 'ACCOUNT_HAS_NO_PASSWORD',
+      });
+    }
     return res.status(401).json({
       error: {
         code: 'INVALID_CREDENTIALS',
@@ -420,7 +625,14 @@ app.post('/auth/login', (req, res) => {
     });
   }
 
-  if (!verifyPassword(password, user.passwordHash)) {
+  const passwordVerification = verifyPassword(password, user.passwordHash);
+  if (!passwordVerification.ok) {
+    if (VERBOSE_HTTP_LOGS) {
+      console.warn('[auth/login] invalid credentials', {
+        email,
+        reason: passwordVerification.reason,
+      });
+    }
     return res.status(401).json({
       error: {
         code: 'INVALID_CREDENTIALS',
@@ -430,6 +642,9 @@ app.post('/auth/login', (req, res) => {
   }
 
   if (!user.emailVerified) {
+    if (VERBOSE_HTTP_LOGS) {
+      console.warn('[auth/login] blocked unverified email', { email });
+    }
     return res.status(403).json({
       error: {
         code: 'EMAIL_NOT_VERIFIED',

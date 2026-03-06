@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Settings, LogOut, Check, X, Link2, PanelLeftClose, PanelLeft, Book } from 'lucide-react';
+import { Settings, LogOut, Check, X, Link2, PanelLeftClose, PanelLeft, Book, Activity } from 'lucide-react';
 import { OrganizationSidebar } from '@/app/components/OrganizationSidebar';
 import { ProjectSidebar } from '@/app/components/ProjectSidebar';
 import { OrganizationView } from '@/app/components/OrganizationView';
@@ -881,6 +881,17 @@ export function Dashboard() {
             )}
           </div>
           <div className="flex items-center gap-2 relative z-10">
+            {user?.isAdmin && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/admin/kafka-monitor')}
+                className="gap-2 text-gray-400 hover:text-white hover:bg-white/5 font-mono rounded-none"
+              >
+                <Activity className="h-4 w-4" />
+                Monitor
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"

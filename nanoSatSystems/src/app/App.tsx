@@ -10,6 +10,7 @@ import { ProtectedRoute } from '@/app/auth/ProtectedRoute';
 import { VerifyEmailPage } from '@/app/components/VerifyEmailPage';
 import { ForgotPasswordPage } from '@/app/components/ForgotPasswordPage';
 import { ResetPasswordPage } from '@/app/components/ResetPasswordPage';
+import { AdminKafkaMonitorPage } from '@/app/components/AdminKafkaMonitorPage';
 
 const router = createBrowserRouter([
   {
@@ -63,6 +64,14 @@ const router = createBrowserRouter([
   {
     path: '/view',
     element: <ViewPage />,
+  },
+  {
+    path: '/admin/kafka-monitor',
+    element: (
+      <ProtectedRoute>
+        <AdminKafkaMonitorPage />
+      </ProtectedRoute>
+    ),
   },
   {
     path: '*',

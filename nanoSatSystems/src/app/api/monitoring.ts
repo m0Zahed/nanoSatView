@@ -1,6 +1,13 @@
+const TRUTHY_VALUES = new Set(['1', 'true', 'yes', 'on']);
+const REMOTE_LAN_ENABLED = TRUTHY_VALUES.has(
+  String(import.meta.env.TESTING_REMOTE_LAN || '')
+    .trim()
+    .toLowerCase()
+);
 const DOCUMENT_PROCESSOR_BASE_URL =
-  import.meta.env.VITE_DOCUMENT_PROCESSOR_BASE_URL?.replace(/\/+$/, '') ||
-  'http://localhost:8080';
+  REMOTE_LAN_ENABLED
+    ? ''
+    : import.meta.env.VITE_DOCUMENT_PROCESSOR_BASE_URL?.replace(/\/+$/, '') || 'http://localhost:8080';
 
 type JsonValue = Record<string, unknown> | null;
 
@@ -58,14 +65,14 @@ async function readJson(response: Response): Promise<JsonValue> {
 }
 
 export async function fetchMonitoringSnapshot() {
-  const response = await fetch(`${DOCUMENT_PROCESSOR_BASE_URL}/api/monitoring/snapshot`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    cache: 'no-store',
-  });
-  const data = (await readJson(response)) as MonitoringSnapshot | null;
-  return { status: response.status, data };
+  try {
+    const response = await fetch(`${DOCUMENT_PROCESSOR_BASE_URL}/api/monitoring/snapshot`, {
+      method: 'GET',
+      cache: 'no-store',
+    });
+    const data = (await readJson(response)) as MonitoringSnapshot | null;
+    return { status: response.status, data };
+  } catch (_error) {
+    return { status: 0, data: null };
+  }
 }
-

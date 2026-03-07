@@ -10,6 +10,7 @@ import { RequirementsView } from '@/app/components/RequirementsView';
 import { TimelineView } from '@/app/components/TimelineView';
 import { ComponentsView } from '@/app/components/ComponentsView';
 import { MembersView } from '@/app/components/MembersView';
+import { DocumentManager } from '@/app/components/DocumentManager';
 import { UserSettings } from '@/app/components/UserSettings';
 import { ViewPage } from '@/app/components/ViewPage';
 import { Button } from '@/app/components/ui/button';
@@ -20,6 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/ta
 import { Alert, AlertDescription } from '@/app/components/ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/app/components/ui/tooltip';
 import { ProjectMembersDialog } from '@/app/components/ProjectMembersDialog';
+import { canAccessKafkaMonitor } from '@/app/utils/kafkaMonitorAccess';
 import { useAuth, type User } from '@/app/auth/AuthContext';
 import {
   createOrganization as apiCreateOrganization,
@@ -130,6 +132,7 @@ function createCurrentUserMember(user: User | null): Member | null {
 }
 
 export function Dashboard() {
+  const isKafkaMonitorAvailable = canAccessKafkaMonitor();
   const navigate = useNavigate();
 
 
@@ -169,7 +172,7 @@ export function Dashboard() {
   const [newMemberEmail, setNewMemberEmail] = useState('');
   
   // Nabigation states
-  const [currentView, setCurrentView] = useState<'project' | 'requirements' | 'timeline' | 'components' | 'members'>('project');
+  const [currentView, setCurrentView] = useState<'project' | 'requirements' | 'timeline' | 'components' | 'members' | 'documents'>('project');
   const [activeProjectTab, setActiveProjectTab] = useState<string>('overview');
   const [isUserSettingsOpen, setIsUserSettingsOpen] = useState(false);
   const [isProjectSidebarVisible, setIsProjectSidebarVisible] = useState(true);
@@ -729,6 +732,11 @@ export function Dashboard() {
     setActiveProjectTab('flow'); // Set the tab to 'flow' (Operational Flow)
   };
 
+  const handleOpenDocumentManager = (projectId: string) => {
+    setSelectedProjectId(projectId);
+    setCurrentView('documents');
+  };
+
   const handleSaveTimelineInView = (timeline: string) => {
     if (!selectedProjectId) return;
 
@@ -828,6 +836,7 @@ export function Dashboard() {
           onAddRequirements={handleOpenAddRequirements}
           onAddTimeline={handleOpenAddTimeline}
           onOpenOperationalFlow={handleOpenOperationalFlow}
+          onOpenDocumentManager={handleOpenDocumentManager}
           onAddComponents={handleOpenAddComponents}
         />
       )}
@@ -881,7 +890,7 @@ export function Dashboard() {
             )}
           </div>
           <div className="flex items-center gap-2 relative z-10">
-            {user?.isAdmin && (
+            {user?.isAdmin && isKafkaMonitorAvailable && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -946,6 +955,8 @@ export function Dashboard() {
               onAddComponent={handleAddComponentInView}
               onRemoveComponent={handleRemoveComponent}
             />
+          ) : currentView === 'documents' && selectedProject ? (
+            <DocumentManager />
           ) : currentView === 'members' && selectedProject ? (
             <MembersView
               projectName={selectedProject.name}

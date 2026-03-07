@@ -11,6 +11,9 @@ import { VerifyEmailPage } from '@/app/components/VerifyEmailPage';
 import { ForgotPasswordPage } from '@/app/components/ForgotPasswordPage';
 import { ResetPasswordPage } from '@/app/components/ResetPasswordPage';
 import { AdminKafkaMonitorPage } from '@/app/components/AdminKafkaMonitorPage';
+import { canAccessKafkaMonitor } from '@/app/utils/kafkaMonitorAccess';
+
+const isKafkaMonitorAvailable = canAccessKafkaMonitor();
 
 const router = createBrowserRouter([
   {
@@ -68,9 +71,13 @@ const router = createBrowserRouter([
   {
     path: '/admin/kafka-monitor',
     element: (
-      <ProtectedRoute>
-        <AdminKafkaMonitorPage />
-      </ProtectedRoute>
+      isKafkaMonitorAvailable ? (
+        <ProtectedRoute>
+          <AdminKafkaMonitorPage />
+        </ProtectedRoute>
+      ) : (
+        <Navigate to="/dashboard" replace />
+      )
     ),
   },
   {

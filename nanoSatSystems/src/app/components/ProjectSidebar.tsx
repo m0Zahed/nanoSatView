@@ -1,4 +1,4 @@
-import { Hash, Plus, Settings, MoreVertical, Trash2, ClipboardList, Calendar, GitBranch, Package } from 'lucide-react';
+import { Hash, Plus, Settings, MoreVertical, Trash2, ClipboardList, Calendar, GitBranch, Package, FileText } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { ScrollArea } from '@/app/components/ui/scroll-area';
 import {
@@ -40,6 +40,7 @@ interface ProjectSidebarProps {
   onAddMember: (projectId: string) => void;
   onViewMembers: (projectId: string) => void;
   onOpenOperationalFlow: (projectId: string) => void;
+  onOpenDocumentManager: (projectId: string) => void;
   onAddRequirements: (projectId: string) => void;
   onAddTimeline: (projectId: string) => void;
   onAddComponents: (projectId: string) => void;
@@ -56,6 +57,7 @@ export function ProjectSidebar({
   onAddMember,
   onViewMembers,
   onOpenOperationalFlow,
+  onOpenDocumentManager,
   onAddRequirements,
   onAddTimeline,
   onAddComponents,
@@ -239,6 +241,20 @@ export function ProjectSidebar({
                   >
                     <GitBranch className="h-3 w-3" />
                     <span>Operational Flow</span>
+                  </button>
+                </div>
+
+                {/* Document Manager Section */}
+                <div className="px-2 mt-1 ml-6">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenDocumentManager(project.id);
+                    }}
+                    className="flex items-center gap-2 text-xs text-gray-500 hover:text-white transition-colors w-full font-mono"
+                  >
+                    <FileText className="h-3 w-3" />
+                    <span>Document Manager</span>
                   </button>
                 </div>
                 

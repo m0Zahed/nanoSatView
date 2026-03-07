@@ -1,6 +1,13 @@
+const TRUTHY_VALUES = new Set(['1', 'true', 'yes', 'on']);
+const REMOTE_LAN_ENABLED = TRUTHY_VALUES.has(
+  String(import.meta.env.TESTING_REMOTE_LAN || '')
+    .trim()
+    .toLowerCase()
+);
 const DOCUMENT_PROCESSOR_BASE_URL =
-  import.meta.env.VITE_DOCUMENT_PROCESSOR_BASE_URL?.replace(/\/+$/, '') ||
-  'http://localhost:8080';
+  REMOTE_LAN_ENABLED
+    ? ''
+    : import.meta.env.VITE_DOCUMENT_PROCESSOR_BASE_URL?.replace(/\/+$/, '') || 'http://localhost:8080';
 
 type JsonValue = Record<string, unknown> | null;
 

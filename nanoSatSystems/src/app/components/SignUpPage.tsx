@@ -5,7 +5,7 @@ import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Separator } from '@/app/components/ui/separator';
-import { postJson } from '@/app/auth/api';
+import { API_BASE_URL, postJson } from '@/app/auth/api';
 
 export function SignUpPage() {
   const [name, setName] = useState('');
@@ -62,7 +62,7 @@ export function SignUpPage() {
   };
 
   const handleGoogleSignUp = () => {
-    window.location.href = '/api/auth/google/start';
+    window.location.href = `${API_BASE_URL}/auth/google/start`;
   };
 
   const handlePictureChange = (event: React.ChangeEvent<HTMLInputElement>) => {

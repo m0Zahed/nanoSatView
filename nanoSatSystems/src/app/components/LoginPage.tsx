@@ -5,7 +5,7 @@ import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Separator } from '@/app/components/ui/separator';
-import { postJson } from '@/app/auth/api';
+import { API_BASE_URL, postJson } from '@/app/auth/api';
 import { useAuth, type User } from '@/app/auth/AuthContext';
 
 export function LoginPage() {
@@ -39,13 +39,15 @@ export function LoginPage() {
       }
 
       setErrorMessage('Login failed. Please try again.');
+    } catch (_error) {
+      setErrorMessage('Cannot reach auth server. Start backend on http://localhost:5000 and try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleGoogleLogin = () => {
-    window.location.href = '/api/auth/google/start';
+    window.location.href = `${API_BASE_URL}/auth/google/start`;
   };
 
   return (

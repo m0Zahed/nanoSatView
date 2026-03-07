@@ -1,7 +1,15 @@
+const TRUTHY_VALUES = new Set(['1', 'true', 'yes', 'on']);
+const REMOTE_LAN_ENABLED = TRUTHY_VALUES.has(
+  String(import.meta.env.TESTING_REMOTE_LAN || '')
+    .trim()
+    .toLowerCase()
+);
+const DEFAULT_PROJECTS_BASE_URL = REMOTE_LAN_ENABLED
+  ? `http://${window.location.hostname}:5001`
+  : 'http://localhost:5001';
 const PROJECTS_BASE_URL =
   import.meta.env.VITE_REQUIREMENTS_BASE_URL?.replace(/\/+$/, '') ||
-  'http://localhost:5001';
-const TRUTHY_VALUES = new Set(['1', 'true', 'yes', 'on']);
+  DEFAULT_PROJECTS_BASE_URL;
 
 const envCandidates = [
   import.meta.env.MODE,

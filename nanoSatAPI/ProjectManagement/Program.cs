@@ -6,7 +6,7 @@ using ProjectManagement.Data;
 using ProjectManagement.Models;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.WebHost.UseUrls("http://localhost:6969", "http://localhost:5001");
+builder.WebHost.UseUrls("http://0.0.0.0:6969", "http://0.0.0.0:5001");
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -35,15 +35,7 @@ builder.Services.AddCors(options =>
         }
         else
         {
-            var defaultDevOrigins = new[]
-            {
-                "http://localhost:5173",
-                "http://127.0.0.1:5173",
-                "http://localhost:5001",
-                "http://localhost:6969"
-            };
-
-            policy.WithOrigins(defaultDevOrigins)
+            policy.SetIsOriginAllowed(IsLocalDevOrigin)
                 .AllowAnyHeader()
                 .AllowAnyMethod()
                 .AllowCredentials();
@@ -1080,6 +1072,50 @@ static object? DbValueToSerializable(object value)
 static string QuoteIdentifier(string identifier)
 {
     return $"\"{identifier.Replace("\"", "\"\"")}\"";
+}
+
+static bool IsLocalDevOrigin(string? origin)
+{
+    if (string.IsNullOrWhiteSpace(origin))
+    {
+        return false;
+    }
+
+    if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri))
+    {
+        return false;
+    }
+
+    if (!string.Equals(uri.Scheme, "http", StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(uri.Scheme, "https", StringComparison.OrdinalIgnoreCase))
+    {
+        return false;
+    }
+
+    var host = uri.Host;
+    if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
+        || host.Equals("127.0.0.1"))
+    {
+        return true;
+    }
+
+    if (System.Net.IPAddress.TryParse(host, out var ip))
+    {
+        var bytes = ip.GetAddressBytes();
+        if (bytes.Length == 4)
+        {
+            // 10.0.0.0/8
+            if (bytes[0] == 10) return true;
+            // 172.16.0.0/12
+            if (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31) return true;
+            // 192.168.0.0/16
+            if (bytes[0] == 192 && bytes[1] == 168) return true;
+            // 100.64.0.0/10 (CGNAT/Tailscale common range)
+            if (bytes[0] == 100 && bytes[1] >= 64 && bytes[1] <= 127) return true;
+        }
+    }
+
+    return false;
 }
 
 static string GetAdminPageHtml()

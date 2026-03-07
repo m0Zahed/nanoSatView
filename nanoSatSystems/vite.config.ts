@@ -1,25 +1,42 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import path from 'path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 
-export default defineConfig({
-  plugins: [
-    // The React and Tailwind plugins are both required for Make, even if
-    // Tailwind is not being actively used – do not remove them
-    react(),
-    tailwindcss(),
-  ],
-  resolve: {
-    alias: {
-      // Alias @ to the src directory
-      '@': path.resolve(__dirname, './src'),
+export default defineConfig(({ mode }) => {
+  const rootEnv = loadEnv(mode, path.resolve(__dirname, '..'), '')
+  const devFlag = String(rootEnv.DEV || '').trim().toLowerCase()
+  const isProjectDevEnabled = devFlag === 'true' || devFlag === '1' || devFlag === 'yes' || devFlag === 'on'
+
+  return {
+    envPrefix: ['VITE_', 'TESTING_'],
+    define: {
+      __APP_DEV_ENABLED__: JSON.stringify(isProjectDevEnabled),
     },
-  },
-  server: {
-    allowedHosts: ['nanosatview.com', 'www.nanosatview.com', '54.234.130.176'],
-  },
-  preview: {
-    allowedHosts: ['nanosatview.com', 'www.nanosatview.com', '54.234.130.176'],
-  },
+    plugins: [
+      react(),
+      tailwindcss(),
+    ],
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
+      },
+    },
+    server: {
+      allowedHosts: ['nanosatview.com', 'www.nanosatview.com', '54.234.130.176'],
+      proxy: {
+        '/api/monitoring': {
+          target: 'http://127.0.0.1:8080',
+          changeOrigin: true,
+        },
+        '/api/diagrams': {
+          target: 'http://127.0.0.1:8080',
+          changeOrigin: true,
+        },
+      },
+    },
+    preview: {
+      allowedHosts: ['nanosatview.com', 'www.nanosatview.com', '54.234.130.176'],
+    },
+  }
 })

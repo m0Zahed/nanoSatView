@@ -1,6 +1,20 @@
+const TRUTHY_VALUES = new Set(['1', 'true', 'yes', 'on']);
+const REMOTE_LAN_ENABLED = TRUTHY_VALUES.has(
+  String(import.meta.env.TESTING_REMOTE_LAN || '')
+    .trim()
+    .toLowerCase()
+);
+const IS_LOCALHOST_HOSTNAME =
+  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const DEFAULT_AUTH_BASE_URL = REMOTE_LAN_ENABLED
+  ? `http://${window.location.hostname}:5000`
+  : IS_LOCALHOST_HOSTNAME
+    ? 'http://localhost:5000'
+    : '/api';
+
 export const API_BASE_URL =
   (import.meta.env.VITE_AUTH_BASE_URL as string | undefined)?.replace(/\/+$/, '') ||
-  'http://localhost:5000';
+  DEFAULT_AUTH_BASE_URL;
 
 export type User = {
   id: string;

@@ -18,31 +18,7 @@ interface Document {
 }
 
 export function DocumentManager() {
-  const [documents, setDocuments] = useState<Document[]>([
-    {
-      id: '1',
-      name: 'Project Requirements.pdf',
-      type: 'upload',
-      fileType: 'pdf',
-      size: '2.4 MB',
-      uploadedAt: new Date('2025-01-20'),
-    },
-    {
-      id: '2',
-      name: 'Budget Spreadsheet',
-      type: 'google-sheets',
-      url: 'https://docs.google.com/spreadsheets/d/example',
-      uploadedAt: new Date('2025-01-19'),
-    },
-    {
-      id: '3',
-      name: 'Technical Specifications.xlsx',
-      type: 'upload',
-      fileType: 'xlsx',
-      size: '1.8 MB',
-      uploadedAt: new Date('2025-01-18'),
-    },
-  ]);
+  const [documents, setDocuments] = useState<Document[]>([]);
 
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const [linkType, setLinkType] = useState<'google-docs' | 'google-sheets' | 'google-chat'>('google-docs');

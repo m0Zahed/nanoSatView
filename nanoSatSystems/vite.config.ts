@@ -38,5 +38,10 @@ export default defineConfig(({ mode }) => {
     preview: {
       allowedHosts: ['nanosatview.com', 'www.nanosatview.com', '54.234.130.176'],
     },
+    test: {
+      environment: 'jsdom',
+      globals: true,
+      setupFiles: './vitest.setup.ts',
+    },
   }
 })

@@ -29,6 +29,26 @@ interface Component {
   notes?: string;
 }
 
+interface DocumentBlob {
+  id: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+  uploadedAt: string;
+}
+
+interface BuilderBlob {
+  id: string;
+  type: 'text' | 'document' | 'diagram';
+  title: string;
+  content: string;
+  sourceId?: string;
+}
+
+const COMPONENTS_API_BASE =
+  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_COMPONENTS_API_BASE_URL) ||
+  'http://127.0.0.1:8090';
+
 interface ComponentsViewProps {
   projectName: string;
   components: string[];
@@ -63,6 +83,25 @@ export function ComponentsView({
   const [diagramQuery, setDiagramQuery] = useState('');
   const [docsQuery, setDocsQuery] = useState('');
   const [timelineQuery, setTimelineQuery] = useState('');
+  const [documents, setDocuments] = useState<DocumentBlob[]>([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [documentsError, setDocumentsError] = useState<string | null>(null);
+  const [builderStack, setBuilderStack] = useState<BuilderBlob[]>([
+    {
+      id: 'seed-text-1',
+      type: 'text',
+      title: 'Mission Context',
+      content: 'Summarize mission context and scope before detailed component references.',
+    },
+    {
+      id: 'seed-diagram-1',
+      type: 'diagram',
+      title: 'System Architecture Diagram',
+      content: 'Attach latest system architecture diagram snapshot.',
+    },
+  ]);
+  const [isBuilderDropActive, setIsBuilderDropActive] = useState(false);
+  const [isGeneratingMarkdown, setIsGeneratingMarkdown] = useState(false);
 
   const parsedRequirements = useMemo(
     () =>
@@ -192,6 +231,194 @@ export function ComponentsView({
   useEffect(() => {
     setMarkdownDraft(generatedMarkdown);
   }, [generatedMarkdown]);
+
+  const filteredDocs = useMemo(() => {
+    const query = docsQuery.trim().toLowerCase();
+    if (!query) {
+      return documents;
+    }
+    return documents.filter(
+      (doc) =>
+        doc.name.toLowerCase().includes(query) ||
+        doc.mimeType.toLowerCase().includes(query) ||
+        doc.id.toLowerCase().includes(query)
+    );
+  }, [docsQuery, documents]);
+
+  const refreshDocuments = async (query: string) => {
+    setDocumentsLoading(true);
+    setDocumentsError(null);
+    try {
+      const url = new URL('/api/v1/documents', COMPONENTS_API_BASE);
+      if (query.trim()) {
+        url.searchParams.set('query', query.trim());
+      }
+      const response = await fetch(url.toString());
+      if (!response.ok) {
+        throw new Error(`Failed to fetch documents (${response.status})`);
+      }
+      const payload = (await response.json()) as { documents?: DocumentBlob[] };
+      setDocuments(payload.documents ?? []);
+    } catch (error) {
+      setDocumentsError(error instanceof Error ? error.message : 'Failed to fetch documents.');
+    } finally {
+      setDocumentsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      refreshDocuments(docsQuery);
+    }, 250);
+    return () => window.clearTimeout(id);
+  }, [docsQuery]);
+
+  const onUploadDocuments = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) {
+      return;
+    }
+
+    setDocumentsLoading(true);
+    setDocumentsError(null);
+    try {
+      for (const file of Array.from(files)) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await fetch(`${COMPONENTS_API_BASE}/api/v1/documents/upload`, {
+          method: 'POST',
+          body: formData,
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to upload ${file.name} (${response.status})`);
+        }
+        const uploaded = (await response.json()) as DocumentBlob;
+        setDocuments((prev) => [uploaded, ...prev.filter((doc) => doc.id !== uploaded.id)]);
+      }
+    } catch (error) {
+      setDocumentsError(error instanceof Error ? error.message : 'Document upload failed.');
+    } finally {
+      setDocumentsLoading(false);
+      event.target.value = '';
+    }
+  };
+
+  const addTextBlob = () => {
+    setBuilderStack((prev) => [
+      ...prev,
+      {
+        id: `text-${Date.now()}`,
+        type: 'text',
+        title: 'Free Text Blob',
+        content: 'Add your component-specific engineering notes here.',
+      },
+    ]);
+  };
+
+  const addDiagramBlob = () => {
+    setBuilderStack((prev) => [
+      ...prev,
+      {
+        id: `diagram-${Date.now()}`,
+        type: 'diagram',
+        title: 'Diagram Blob',
+        content: 'Reference a saved diagram artifact.',
+      },
+    ]);
+  };
+
+  const removeBlob = (id: string) => {
+    setBuilderStack((prev) => prev.filter((blob) => blob.id !== id));
+  };
+
+  const onDocumentDragStart = (event: React.DragEvent<HTMLDivElement>, doc: DocumentBlob) => {
+    event.dataTransfer.setData(
+      'application/json',
+      JSON.stringify({
+        kind: 'document-card',
+        id: doc.id,
+      })
+    );
+    event.dataTransfer.effectAllowed = 'copy';
+  };
+
+  const onBuilderDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsBuilderDropActive(false);
+    const raw = event.dataTransfer.getData('application/json');
+    if (!raw) {
+      return;
+    }
+    try {
+      const parsed = JSON.parse(raw) as { kind?: string; id?: string };
+      if (parsed.kind !== 'document-card' || !parsed.id) {
+        return;
+      }
+      const matchedDoc = documents.find((doc) => doc.id === parsed.id);
+      if (!matchedDoc) {
+        return;
+      }
+      setBuilderStack((prev) => [
+        ...prev,
+        {
+          id: `document-${Date.now()}`,
+          type: 'document',
+          title: matchedDoc.name,
+          content: `Doc ${matchedDoc.id} (${matchedDoc.mimeType}, ${matchedDoc.sizeBytes} bytes)`,
+          sourceId: matchedDoc.id,
+        },
+      ]);
+    } catch {
+      // Ignore malformed drag payload.
+    }
+  };
+
+  const generateMarkdownFromStack = async () => {
+    setIsGeneratingMarkdown(true);
+    try {
+      const response = await fetch(`${COMPONENTS_API_BASE}/api/v1/markdown/from-stack`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          projectName,
+          component: selectedComponent,
+          requirements: filteredRequirements,
+          stack: builderStack,
+        }),
+      });
+
+      if (response.ok) {
+        const payload = (await response.json()) as { markdown?: string };
+        if (payload.markdown && payload.markdown.trim()) {
+          setMarkdownDraft(payload.markdown);
+          setActiveTab('markdown');
+          return;
+        }
+      }
+    } catch {
+      // Fall through to local fallback.
+    } finally {
+      setIsGeneratingMarkdown(false);
+    }
+
+    const fallback = [
+      `# ${projectName} Document Draft`,
+      '',
+      `## Component`,
+      selectedComponent ? `- ${selectedComponent.name} (${selectedComponent.type})` : '- None selected',
+      '',
+      '## Stack',
+      ...builderStack.map((blob, index) => `### ${index + 1}. [${blob.type.toUpperCase()}] ${blob.title}\n${blob.content}`),
+      '',
+      '## Requirements Snapshot',
+      ...filteredRequirements.slice(0, 8).map((req) => `- **${req.id}** ${req.title}`),
+      '',
+    ].join('\n');
+    setMarkdownDraft(fallback);
+    setActiveTab('markdown');
+  };
 
   const handleAdd = () => {
     if (newComponent.name && newComponent.type) {
@@ -575,6 +802,38 @@ export function ComponentsView({
                   <div className="text-xs text-gray-400 font-mono">
                     Standards, specs, and notes connected to the component.
                   </div>
+                  <input
+                    type="file"
+                    multiple
+                    className="text-xs font-mono text-gray-300 file:mr-2 file:border file:border-white/20 file:bg-[#0f0f12] file:text-gray-200 file:px-2 file:py-1 file:rounded-none"
+                    onChange={onUploadDocuments}
+                    data-testid="doc-upload-input"
+                  />
+                  {documentsLoading ? (
+                    <div className="text-xs text-gray-500 font-mono">Loading documents...</div>
+                  ) : null}
+                  {documentsError ? (
+                    <div className="text-xs text-red-400 font-mono">{documentsError}</div>
+                  ) : null}
+                  <div className="border border-white/10 bg-black/20 max-h-52 overflow-auto" data-testid="docs-cards">
+                    {filteredDocs.length === 0 ? (
+                      <div className="p-3 text-xs text-gray-500 font-mono">No docs found.</div>
+                    ) : (
+                      filteredDocs.map((doc) => (
+                        <div
+                          key={doc.id}
+                          draggable
+                          onDragStart={(event) => onDocumentDragStart(event, doc)}
+                          className="p-3 border-b border-white/10 last:border-b-0 hover:bg-white/5 cursor-grab active:cursor-grabbing"
+                          data-testid={`doc-card-${doc.id}`}
+                        >
+                          <p className="text-sm text-white font-mono">{doc.name}</p>
+                          <p className="text-[11px] text-gray-400 font-mono mt-1">{doc.mimeType}</p>
+                          <p className="text-[11px] text-gray-500 font-mono mt-1">Drag into Document Builder canvas</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </Card>
 
                 <Card className="p-4 bg-[#151518] border-white/10 rounded-none space-y-3">
@@ -646,12 +905,44 @@ export function ComponentsView({
                 <div className="space-y-4">
                   <Card className="p-5 bg-[#151518] border-white/10 rounded-none min-h-[320px]">
                     <div className="text-xs text-gray-400 font-mono mb-3">Document canvas</div>
-                    <div className="space-y-3 text-sm font-mono">
-                      <div className="border border-white/10 bg-black/20 p-3">R1 requirement</div>
-                      <div className="border border-white/10 bg-black/20 p-3">Explain something...</div>
-                      <div className="border border-white/10 bg-black/20 p-3">
-                        Supporting references: D1, D2, D3
-                      </div>
+                    <div
+                      className={`space-y-3 text-sm font-mono min-h-[220px] border border-dashed p-3 transition-colors ${
+                        isBuilderDropActive ? 'border-white/60 bg-white/5' : 'border-white/10 bg-black/20'
+                      }`}
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        setIsBuilderDropActive(true);
+                      }}
+                      onDragLeave={() => setIsBuilderDropActive(false)}
+                      onDrop={onBuilderDrop}
+                      data-testid="builder-drop-zone"
+                    >
+                      {builderStack.length === 0 ? (
+                        <div className="text-xs text-gray-500">Drop document cards here to build your stack.</div>
+                      ) : (
+                        builderStack.map((blob, index) => (
+                          <div
+                            key={blob.id}
+                            className="border border-white/10 bg-black/30 p-3"
+                            data-testid={`builder-blob-${index}`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div>
+                                <p className="text-xs text-gray-400 uppercase tracking-wide">{blob.type}</p>
+                                <p className="text-sm text-white">{blob.title}</p>
+                                <p className="text-xs text-gray-400 mt-1">{blob.content}</p>
+                              </div>
+                              <button
+                                type="button"
+                                className="text-gray-500 hover:text-red-300"
+                                onClick={() => removeBlob(blob.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </Card>
 
@@ -661,6 +952,13 @@ export function ComponentsView({
                       Prompts synthesize selected content into structured text ready for export.
                     </div>
                     <div className="mt-4 flex gap-2">
+                      <Button
+                        className="bg-white text-black hover:bg-gray-200 rounded-none font-mono text-xs"
+                        onClick={generateMarkdownFromStack}
+                        disabled={isGeneratingMarkdown}
+                      >
+                        {isGeneratingMarkdown ? 'Generating...' : 'Generate Markdown from Stack'}
+                      </Button>
                       <Button className="bg-white text-black hover:bg-gray-200 rounded-none font-mono text-xs">
                         Export to Google Doc
                       </Button>
@@ -677,14 +975,18 @@ export function ComponentsView({
                 <Card className="p-5 bg-[#151518] border-white/10 rounded-none">
                   <div className="text-xs text-gray-400 font-mono mb-4">Controls</div>
                   <div className="space-y-3">
-                    <Button className="w-full bg-white text-black hover:bg-gray-200 rounded-none font-mono text-xs">
+                    <Button
+                      className="w-full bg-white text-black hover:bg-gray-200 rounded-none font-mono text-xs"
+                      onClick={addTextBlob}
+                    >
                       Add text
                     </Button>
                     <Button
                       variant="outline"
                       className="w-full border-white/10 text-gray-300 hover:text-white rounded-none font-mono text-xs"
+                      onClick={addDiagramBlob}
                     >
-                      Add prompt
+                      Add diagram
                     </Button>
                   </div>
                 </Card>

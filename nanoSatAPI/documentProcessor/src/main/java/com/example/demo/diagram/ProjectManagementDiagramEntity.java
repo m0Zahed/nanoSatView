@@ -32,6 +32,9 @@ public class ProjectManagementDiagramEntity {
     @Column(name = "filepath_local", nullable = false, length = 1000)
     private String filepathLocal;
 
+    @Column(name = "filepath_s3", length = 1000)
+    private String filepathS3;
+
     public String getDiagramId() {
         return diagramId;
     }
@@ -86,5 +89,13 @@ public class ProjectManagementDiagramEntity {
 
     public void setFilepathLocal(String filepathLocal) {
         this.filepathLocal = filepathLocal;
+    }
+
+    public String getFilepathS3() {
+        return filepathS3;
+    }
+
+    public void setFilepathS3(String filepathS3) {
+        this.filepathS3 = filepathS3;
     }
 }

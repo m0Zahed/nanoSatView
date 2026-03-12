@@ -17,6 +17,7 @@ Columns:
 - `diagram_name`
 - `diagram_description`
 - `filepath_local`
+- `filepath_s3` (nullable, only populated when S3 upload succeeds)
 
 ## Diagram save endpoint
 
@@ -50,6 +51,7 @@ Success response:
 
 - `GET /api/diagrams/project/{projectId}`
 - `GET /api/diagrams/{diagramId}`
+- `GET /api/diagrams/storage/health`
 
 ## Run (no Docker required)
 
@@ -60,6 +62,38 @@ mvn spring-boot:run
 ```
 
 Default DB is local H2 file storage (`./data/project-management`) and XML files are stored under `./data/diagrams`.
+
+## Optional S3 backup storage
+
+The service always stores incoming diagram XML files locally first, then attempts S3 upload only when enabled.
+
+Environment-backed properties:
+
+```properties
+APP_S3_ENABLED=true
+APP_S3_BUCKET=your-bucket-name
+APP_S3_REGION=us-east-1
+APP_S3_KEY_PREFIX=diagrams
+APP_S3_ENDPOINT=
+APP_S3_PATH_STYLE_ACCESS=false
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+AWS_SESSION_TOKEN=...
+```
+
+Local dev secret file option:
+- Copy `.env.local.example` to `.env.local` in this folder.
+- The file is auto-loaded at startup via `spring.config.import=optional:file:.env.local[.properties]`.
+- `.env.local` is ignored by git via the root `.gitignore` (`.env.*`).
+
+Quick local setup helper (stores secrets in your user environment, not in git files):
+
+```powershell
+.\scripts\set-local-secrets.ps1 -S3Bucket your-bucket-name -S3Region us-east-1
+```
+
+Least-privilege IAM policy template:
+- `ops/iam/s3-diagram-policy.json` (replace `REPLACE_WITH_BUCKET_NAME`)
 
 ## Optional Kafka mode
 

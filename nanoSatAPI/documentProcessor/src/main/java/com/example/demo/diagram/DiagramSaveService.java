@@ -13,21 +13,28 @@ import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class DiagramSaveService {
 
+    private static final Logger log = LoggerFactory.getLogger(DiagramSaveService.class);
+
     private final ProjectManagementDiagramRepository repository;
     private final ObjectProvider<DiagramKafkaEventPublisher> kafkaPublisher;
+    private final ObjectProvider<DiagramS3StorageService> s3StorageService;
     private final String storageRoot;
 
     public DiagramSaveService(
         ProjectManagementDiagramRepository repository,
         ObjectProvider<DiagramKafkaEventPublisher> kafkaPublisher,
+        ObjectProvider<DiagramS3StorageService> s3StorageService,
         @Value("${app.diagram.storage-root:./data/diagrams}") String storageRoot
     ) {
         this.repository = repository;
         this.kafkaPublisher = kafkaPublisher;
+        this.s3StorageService = s3StorageService;
         this.storageRoot = storageRoot;
     }
 
@@ -49,6 +56,7 @@ public class DiagramSaveService {
         entity.setDiagramName(request.diagramName().trim());
         entity.setDiagramDescription((request.diagramDescription() == null ? "" : request.diagramDescription()).trim());
         entity.setFilepathLocal(xmlPath.toAbsolutePath().toString());
+        entity.setFilepathS3(uploadToS3IfConfigured(xmlPath, request.projectId().trim(), diagramId));
 
         repository.save(entity);
 
@@ -87,5 +95,27 @@ public class DiagramSaveService {
 
     private String sanitizeSegment(String raw) {
         return raw.replaceAll("[^A-Za-z0-9._-]", "_");
+    }
+
+    private String uploadToS3IfConfigured(Path localFile, String projectId, String diagramId) {
+        DiagramS3StorageService uploader = s3StorageService.getIfAvailable();
+        if (uploader == null) {
+            return null;
+        }
+
+        try {
+            String s3Path = uploader.uploadDiagramFile(localFile, projectId, diagramId);
+            log.info("Uploaded diagram {} for project {} to {}", diagramId, projectId, s3Path);
+            return s3Path;
+        } catch (RuntimeException ex) {
+            log.warn(
+                "Failed to upload diagram {} for project {} to S3. Local file remains at {}. Cause: {}",
+                diagramId,
+                projectId,
+                localFile.toAbsolutePath(),
+                ex.getMessage()
+            );
+            return null;
+        }
     }
 }

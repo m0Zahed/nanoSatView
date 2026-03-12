@@ -4,6 +4,8 @@ import com.example.demo.diagram.DiagramSaveRequest;
 import com.example.demo.diagram.DiagramSaveResponse;
 import com.example.demo.diagram.DiagramSaveService;
 import com.example.demo.diagram.DiagramSummaryResponse;
+import com.example.demo.diagram.StorageHealthResponse;
+import com.example.demo.diagram.StorageHealthService;
 import jakarta.validation.Valid;
 import java.io.IOException;
 import java.util.List;
@@ -23,9 +25,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class DiagramController {
 
     private final DiagramSaveService diagramSaveService;
+    private final StorageHealthService storageHealthService;
 
-    public DiagramController(DiagramSaveService diagramSaveService) {
+    public DiagramController(DiagramSaveService diagramSaveService, StorageHealthService storageHealthService) {
         this.diagramSaveService = diagramSaveService;
+        this.storageHealthService = storageHealthService;
     }
 
     @PostMapping("/save")
@@ -66,5 +70,14 @@ public class DiagramController {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/storage/health")
+    public ResponseEntity<StorageHealthResponse> getStorageHealth() {
+        StorageHealthResponse health = storageHealthService.check();
+        HttpStatus status = health.localStorageReady() && (!health.s3Enabled() || health.s3Reachable())
+            ? HttpStatus.OK
+            : HttpStatus.SERVICE_UNAVAILABLE;
+        return ResponseEntity.status(status).body(health);
     }
 }

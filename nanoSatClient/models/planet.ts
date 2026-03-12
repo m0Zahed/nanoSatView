@@ -11,11 +11,12 @@ export default class Planet {
   private cloudRef: THREE.Mesh | null = null;
   private textureLoaderRef: THREE.TextureLoader = new THREE.TextureLoader();
   private loadedTexture: boolean = false;
-  private radius : int;
+  private radius : number;
   group: THREE.Group = new THREE.Group();
 
-  constructor(radius = 5) {
-    this.initialiseTexture(radius);
+  constructor() {
+    this.radius = 5;
+    this.initialiseTexture(this.radius);
   }
 
   private loadTexture(src: string): THREE.Texture {
@@ -27,7 +28,7 @@ export default class Planet {
     return texture;
   }
 
-  private initialiseTexture(radius) {
+  private initialiseTexture(radius : number) {
     const coordmesh = new THREE.MeshStandardMaterial({ map: this.loadTexture(globe1.src) });
     const earthMesh = new THREE.MeshBasicMaterial({
       opacity: 0.57,
@@ -49,15 +50,10 @@ export default class Planet {
     this.coordRef = new THREE.Mesh(geometry, coordmesh);
     this.coordRef.name = 'cloudRef';
 
-    // Light
-    const lights = new THREE.DirectionalLight(0xFFFFFF);
-    lights.position.set(10, 0, 0);
-
     // Create a Group Reference
     this.group.add(this.sphereRef);
     this.group.add(this.coordRef);
     this.group.add(this.cloudRef);
-    this.group.add(lights);
 
     this.loadedTexture = true;
 

@@ -1,0 +1,26 @@
+.sidebar {
+  position: absolute;
+  top: 0;
+  right: -300px; /* Start hidden off-screen */
+  width: 300px;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8); /* Transparent background */
+  padding: 20px;
+  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+  z-index: 10; /* Ensure it overlays the renderer */
+  transition: right 0.3s ease; /* Smooth transition */
+  color: white; /* White text color */
+  border-left: 2px solid white; /* White border */
+}
+
+.sidebar.visible {
+  right: 0; /* Slide in when visible */
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: white; /* White close button */
+}

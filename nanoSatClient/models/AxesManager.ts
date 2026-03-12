@@ -162,10 +162,11 @@ export default class AxesManager {
   private _createTextSprite(text: string): THREE.Sprite {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
-    context.font = '38px Arial';
-    context.fillStyle = 'yellow';
-    context.fillText(text, 0, 24);
-
+    if(context) {
+      context.font = '38px Arial';
+      context.fillStyle = 'yellow';
+      context.fillText(text, 0, 24);
+    }
     const texture = new THREE.CanvasTexture(canvas);
     const material = new THREE.SpriteMaterial({ map: texture });
     const sprite = new THREE.Sprite(material);
@@ -176,10 +177,10 @@ export default class AxesManager {
   /**
    * @brief Adds a particular Frame to the Scene 
    */
-  addFrameToScene(scene : THEE.Scene, frame : 'Renderer' | 'ECEF' | 'ECI')
+  addFrameToScene(scene : THREE.Scene, frame : 'Renderer' | 'ECEF' | 'ECI')
   {
     console.error("location" , this.getFrameByName(frame));
-    scene.add(this.getFrameByName(frame)); 
+    scene.add(this.getFrameByName(frame)!); 
   }
 }
 

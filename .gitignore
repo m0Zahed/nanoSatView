@@ -51,6 +51,8 @@ coverage/
 !.env.example
 .envrc
 .direnv/
+.venv/
+**/.venv/
 
 ### Typesense data
 typesense-data/

@@ -21,6 +21,7 @@ services:
       EMAIL_FROM: ${EMAIL_FROM:-no-reply@local.test}
     depends_on:
       - mailhog
+    restart: unless-stopped
 
   requirements-api:
     build:
@@ -35,6 +36,7 @@ services:
       APP_VERSION: dev
     depends_on:
       - postgres
+    restart: unless-stopped
 
   client-web:
     build:
@@ -45,10 +47,11 @@ services:
         VITE_REQUIREMENTS_BASE_URL: /api/requirements
     ports:
       - "5173:5173"
+    restart: unless-stopped
 
   typesense:
     image: typesense/typesense:26.0
-    restart: "no"
+    restart: unless-stopped
     ports:
       - "8200:8108"
     volumes:
@@ -66,12 +69,14 @@ services:
       POSTGRES_PASSWORD: postgres
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
 
   mailhog:
     image: mailhog/mailhog:v1.0.1
     ports:
       - "1025:1025"
       - "8025:8025"
+    restart: unless-stopped
 
   reverse-proxy:
     image: nginx:1.25-alpine

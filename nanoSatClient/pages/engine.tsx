@@ -20,7 +20,7 @@ export default function EnginePage() {
   return (
     <>
       <Head>
-        <title>nanoSatView Engine</title>
+        <title>nanoSat</title>
         <meta name="description" content="Satellite visualization engine" />
         <link rel="icon" href="/favicon.ico" />
       </Head>

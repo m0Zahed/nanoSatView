@@ -37,8 +37,8 @@ public class Project
     [MaxLength(200)]
     public string OrganizationId { get; set; } = string.Empty;
 
-    [MaxLength(200)]
-    public string RequirementsListId { get; set; } = string.Empty;
+    public Guid RequirementsListId { get; set; }
+    public RequirementsList? RequirementsList { get; set; }
 
     [MaxLength(200)]
     public string ComponentsListId { get; set; } = string.Empty;

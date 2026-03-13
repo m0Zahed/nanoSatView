@@ -12,6 +12,12 @@ const crypto = require('crypto');
 const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 5000;
 const APP_VERSION = process.env.APP_VERSION || 'unknown';
+const runtimeEnv = (process.env.NODE_ENV || process.env.ENV || process.env['.env'] || '')
+  .trim()
+  .toLowerCase();
+const IS_TESTING_ENV = runtimeEnv === 'testing';
+const TESTING_BYPASS_EMAIL = 'testing-bypass@nanosat.local';
+const TESTING_BYPASS_NAME = 'Testing Bypass User';
 // Normalize URLs so we don't end up with double slashes in redirects/CORS
 const rawOrigins = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
 const CLIENT_ORIGINS = rawOrigins
@@ -58,6 +64,10 @@ const oauthClient = new OAuth2Client({
   redirectUri: GOOGLE_REDIRECT_URI,
 });
 
+if (IS_TESTING_ENV) {
+  console.warn('[auth] testing mode enabled: login bypass is active');
+}
+
 function createId() {
   return crypto.randomUUID();
 }
@@ -92,6 +102,21 @@ function findUserByUsername(username) {
 
 function findUserByGoogleSub(googleSub) {
   return db.prepare('SELECT * FROM users WHERE googleSub = ?').get(googleSub);
+}
+
+function findOrCreateTestingBypassUser() {
+  const existing = findUserByEmail(TESTING_BYPASS_EMAIL);
+  if (existing) {
+    return existing;
+  }
+
+  const userId = createId();
+  db.prepare(
+    `INSERT INTO users (id, email, fullName, username, dateOfBirth, emailVerified, passwordHash, googleSub, pictureUrl)
+     VALUES (?, ?, ?, NULL, NULL, 1, NULL, NULL, NULL)`
+  ).run(userId, TESTING_BYPASS_EMAIL, TESTING_BYPASS_NAME);
+
+  return findUserById(userId);
 }
 
 function linkGoogleSub(userId, googleSub, pictureUrl) {
@@ -352,6 +377,27 @@ app.post('/auth/signup', (req, res) => {
 });
 
 app.post('/auth/login', (req, res) => {
+  if (IS_TESTING_ENV) {
+    const testUser = findOrCreateTestingBypassUser();
+    if (!testUser) {
+      return res.status(500).json({
+        error: {
+          code: 'TEST_LOGIN_BYPASS_FAILED',
+          message: 'Unable to initialize testing login bypass user.',
+        },
+      });
+    }
+
+    const sessionId = createSession(testUser.id);
+    res.cookie('sid', sessionId, {
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: SESSION_MAX_AGE_MS,
+    });
+
+    return res.status(200).json({ user: toUserResponse(testUser) });
+  }
+
   const email = typeof req.body?.email === 'string' ? normalizeEmail(req.body.email) : '';
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
 

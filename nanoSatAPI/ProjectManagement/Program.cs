@@ -45,12 +45,17 @@ var app = builder.Build();
 
 app.UseCors();
 
+
+
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapGet("/version", (IConfiguration config) =>
 {
     var version = config["APP_VERSION"] ?? "unknown";
     return Results.Ok(new { version });
 });
+
+// =======================================   REQUIREMENTS  ============================================= 
+
 
 app.MapGet("/requirements", async (RequirementsDbContext db) =>
     await db.Requirements.AsNoTracking().OrderBy(r => r.Title).ToListAsync()
@@ -69,6 +74,14 @@ app.MapPost("/requirements", async (RequirementCreateDto input, RequirementsDbCo
         return Results.BadRequest(new { error = "Invalid requirement payload." });
     }
 
+    var listExists = await db.RequirementsLists
+        .AsNoTracking()
+        .AnyAsync(l => l.Id == input.RequirementsListId);
+    if (!listExists)
+    {
+        return Results.BadRequest(new { error = "RequirementsListId does not exist." });
+    }
+
     var requirement = new Requirement
     {
         Title = input.Title.Trim(),
@@ -76,6 +89,7 @@ app.MapPost("/requirements", async (RequirementCreateDto input, RequirementsDbCo
         Type = input.Type.Trim(),
         Level = input.Level,
         Subsystem = input.Subsystem.Trim(),
+        RequirementsListId = input.RequirementsListId,
         Tags = NormalizeTags(input.Tags),
     };
 
@@ -92,6 +106,14 @@ app.MapPut("/requirements/{id:guid}", async (Guid id, RequirementUpdateDto input
         return Results.BadRequest(new { error = "Invalid requirement payload." });
     }
 
+    var listExists = await db.RequirementsLists
+        .AsNoTracking()
+        .AnyAsync(l => l.Id == input.RequirementsListId);
+    if (!listExists)
+    {
+        return Results.BadRequest(new { error = "RequirementsListId does not exist." });
+    }
+
     var requirement = await db.Requirements.FirstOrDefaultAsync(r => r.Id == id);
     if (requirement is null)
     {
@@ -103,6 +125,7 @@ app.MapPut("/requirements/{id:guid}", async (Guid id, RequirementUpdateDto input
     requirement.Type = input.Type.Trim();
     requirement.Level = input.Level;
     requirement.Subsystem = input.Subsystem.Trim();
+    requirement.RequirementsListId = input.RequirementsListId;
     requirement.Tags = NormalizeTags(input.Tags);
 
     await db.SaveChangesAsync();
@@ -124,7 +147,7 @@ app.MapDelete("/requirements/{id:guid}", async (Guid id, RequirementsDbContext d
     return Results.NoContent();
 });
 
-// --- Projects ---
+// =========================== Projects ==========================
 
 app.MapGet("/projects", async (RequirementsDbContext db) =>
     await db.Projects.AsNoTracking().OrderBy(p => p.Name).ToListAsync()
@@ -148,6 +171,10 @@ app.MapPost("/projects", async (ProjectCreateDto input, RequirementsDbContext db
         return Results.BadRequest(new { error = "Invalid project payload." });
     }
 
+    // Always create a list so Requirements can FK to something real.
+    var requirementsList = new RequirementsList();
+    db.RequirementsLists.Add(requirementsList);
+
     var project = new Project
     {
         Name = normalized.Name,
@@ -156,7 +183,7 @@ app.MapPost("/projects", async (ProjectCreateDto input, RequirementsDbContext db
         IsPublic = normalized.IsPublic,
         PersonalProject = normalized.PersonalProject,
         OrganizationId = normalized.OrganizationId,
-        RequirementsListId = normalized.RequirementsListId,
+        RequirementsListId = requirementsList.Id,
         ComponentsListId = normalized.ComponentsListId,
         TimelineId = normalized.TimelineId,
         IntegrationsId = normalized.IntegrationsId,
@@ -189,6 +216,19 @@ app.MapPut("/projects/{id:guid}", async (Guid id, ProjectUpdateDto input, Requir
         return Results.NotFound();
     }
 
+    if (normalized.RequirementsListId is Guid listId)
+    {
+        var listExists = await db.RequirementsLists
+            .AsNoTracking()
+            .AnyAsync(l => l.Id == listId);
+        if (!listExists)
+        {
+            return Results.BadRequest(new { error = "RequirementsListId does not exist." });
+        }
+
+        project.RequirementsListId = listId;
+    }
+
     var previousMembers = project.MemberIds.ToArray();
     var previousOrganizationId = project.OrganizationId;
 
@@ -198,7 +238,6 @@ app.MapPut("/projects/{id:guid}", async (Guid id, ProjectUpdateDto input, Requir
     project.IsPublic = normalized.IsPublic;
     project.PersonalProject = normalized.PersonalProject;
     project.OrganizationId = normalized.OrganizationId;
-    project.RequirementsListId = normalized.RequirementsListId;
     project.ComponentsListId = normalized.ComponentsListId;
     project.TimelineId = normalized.TimelineId;
     project.IntegrationsId = normalized.IntegrationsId;
@@ -233,6 +272,9 @@ app.MapDelete("/projects/{id:guid}", async (Guid id, RequirementsDbContext db) =
     return Results.NoContent();
 });
 
+/**
+ * This builds the invite link to obtain the  
+ */
 app.MapPost("/projects/{id:guid}/invites", async (Guid id, RequirementsDbContext db, IConfiguration config) =>
 {
     var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id);
@@ -301,6 +343,9 @@ app.MapPost("/projects/join", async (ProjectJoinRequest input, RequirementsDbCon
     return Results.Ok(project);
 });
 
+
+// ================================ Organisation ==================================================
+
 app.MapGet("/organizations/{organizationId}/projects", async (string organizationId, RequirementsDbContext db) =>
 {
     organizationId = organizationId?.Trim() ?? string.Empty;
@@ -318,6 +363,7 @@ app.MapGet("/organizations/{organizationId}/projects", async (string organizatio
     return Results.Ok(projects);
 });
 
+// =============================== Get Projects by member  ==========================================
 app.MapGet("/members/{memberId}/projects", async (string memberId, RequirementsDbContext db) =>
 {
     memberId = memberId?.Trim() ?? string.Empty;
@@ -377,6 +423,8 @@ await ApplyMigrationsWithRetryAsync(app);
 
 app.Run();
 
+// ==================  Functions to verify if the API payload is correct for that API call ============================
+
 static bool IsValidRequirementCreate(RequirementCreateDto input)
 {
     return IsValidRequirementFields(
@@ -384,6 +432,7 @@ static bool IsValidRequirementCreate(RequirementCreateDto input)
         input.Description,
         input.Type,
         input.Subsystem,
+        input.RequirementsListId,
         input.Tags
     );
 }
@@ -395,6 +444,7 @@ static bool IsValidRequirementUpdate(RequirementUpdateDto input)
         input.Description,
         input.Type,
         input.Subsystem,
+        input.RequirementsListId,
         input.Tags
     );
 }
@@ -404,15 +454,20 @@ static bool IsValidRequirementFields(
     string description,
     string type,
     string subsystem,
+    Guid requirementsListId,
     string[] tags)
 {
     return !string.IsNullOrWhiteSpace(title)
         && !string.IsNullOrWhiteSpace(description)
         && !string.IsNullOrWhiteSpace(type)
         && !string.IsNullOrWhiteSpace(subsystem)
+        && requirementsListId != Guid.Empty
         && tags is { Length: > 0 };
 }
 
+/**
+ * Converts the tags into standard form
+ */
 static string[] NormalizeTags(string[] tags)
 {
     return tags
@@ -422,6 +477,9 @@ static string[] NormalizeTags(string[] tags)
         .ToArray();
 }
 
+/**
+ * Normalize and return a Data Transfer Object
+ */
 static ProjectCreateDto NormalizeProjectCreate(ProjectCreateDto input)
 {
     var personal = input.PersonalProject;
@@ -438,7 +496,7 @@ static ProjectCreateDto NormalizeProjectCreate(ProjectCreateDto input)
         Owner = input.Owner.Trim(),
         PersonalProject = personal,
         OrganizationId = orgId,
-        RequirementsListId = (input.RequirementsListId ?? string.Empty).Trim(),
+        RequirementsListId = input.RequirementsListId,
         ComponentsListId = (input.ComponentsListId ?? string.Empty).Trim(),
         TimelineId = (input.TimelineId ?? string.Empty).Trim(),
         IntegrationsId = (input.IntegrationsId ?? string.Empty).Trim(),
@@ -464,7 +522,7 @@ static ProjectUpdateDto NormalizeProjectUpdate(ProjectUpdateDto input)
         Owner = input.Owner.Trim(),
         PersonalProject = personal,
         OrganizationId = orgId,
-        RequirementsListId = (input.RequirementsListId ?? string.Empty).Trim(),
+        RequirementsListId = input.RequirementsListId,
         ComponentsListId = (input.ComponentsListId ?? string.Empty).Trim(),
         TimelineId = (input.TimelineId ?? string.Empty).Trim(),
         IntegrationsId = (input.IntegrationsId ?? string.Empty).Trim(),
@@ -498,6 +556,9 @@ static string GenerateInviteToken()
     return Convert.ToHexString(Guid.NewGuid().ToByteArray()).ToLowerInvariant();
 }
 
+/**
+ * Function to build invite link
+ */
 static string? BuildInviteLink(IConfiguration config, string token)
 {
     var baseUrl = config["FRONTEND__BASE_URL"] ?? config["ALLOWED_ORIGINS"]?.Split(',').FirstOrDefault();

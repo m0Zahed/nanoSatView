@@ -9,6 +9,7 @@ import {
 } from '@/app/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/app/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/app/components/ui/tooltip';
+import type { ProjectRequirement } from '@/app/api/requirements';
 
 interface Member {
   id: string;
@@ -24,7 +25,7 @@ interface Project {
   description: string;
   createdAt: Date;
   members?: Member[];
-  requirements?: string[];
+  requirements?: ProjectRequirement[];
   timeline?: string;
   components?: any[];
 }

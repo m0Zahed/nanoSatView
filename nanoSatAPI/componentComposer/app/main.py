@@ -128,10 +128,11 @@ def generate_markdown(request: MarkdownRequest) -> dict[str, str]:
     if not stack_lines:
         stack_lines = ["_No stack blobs provided._", ""]
 
-    req_lines = [
-        f"- **{req.get('id', 'REQ')}** {req.get('title', 'Untitled requirement')}"
-        for req in request.requirements[:20]
-    ]
+    req_lines = []
+    for req in request.requirements[:20]:
+        req_id = req.get("reqId") or req.get("id") or "REQ"
+        req_description = req.get("description") or req.get("title") or "Untitled requirement"
+        req_lines.append(f"- **{req_id}** {req_description}")
     if not req_lines:
         req_lines = ["- No linked requirements."]
 

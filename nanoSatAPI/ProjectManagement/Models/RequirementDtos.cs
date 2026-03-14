@@ -1,21 +1,19 @@
 namespace ProjectManagement.Models;
 
 public record RequirementCreateDto(
-    string Title,
+    string ReqId,
     string Description,
-    string Type,
-    RequirementLevel Level,
     string Subsystem,
     Guid ProjectId,
-    string[] Tags
+    string[] Tags,
+    string[] AssignedComponents
 );
 
 public record RequirementUpdateDto(
-    string Title,
+    string ReqId,
     string Description,
-    string Type,
-    RequirementLevel Level,
     string Subsystem,
     Guid ProjectId,
-    string[] Tags
+    string[] Tags,
+    string[] AssignedComponents
 );

@@ -12,7 +12,17 @@ const baseProps = {
       notes: 'primary',
     }),
   ],
-  requirements: [],
+  requirements: [
+    {
+      id: 'req-db-1',
+      reqId: 'REQ-1',
+      description: 'Maintain thermal survivability.',
+      subsystem: 'Thermal',
+      tags: ['thermal'],
+      assignedComponents: ['Sensor Pod'],
+      projectId: 'project-1',
+    },
+  ],
   onAddComponent: vi.fn(),
   onRemoveComponent: vi.fn(),
 };
@@ -22,7 +32,7 @@ describe('ComponentsView document builder flow', () => {
     vi.restoreAllMocks();
   });
 
-  it('fetches docs, uploads a doc, and drops a doc card into builder stack', async () => {
+  it('fetches docs, uploads a doc, and drops document and requirement cards into the builder stack', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method || 'GET';
@@ -101,5 +111,25 @@ describe('ComponentsView document builder flow', () => {
     fireEvent.drop(dropZone, { dataTransfer });
 
     expect(await screen.findByText('Doc doc-uploaded (application/pdf, 2048 bytes)')).toBeInTheDocument();
+
+    const requirementCard = screen.getByTestId('requirement-card-req-db-1');
+    const requirementTransfer = {
+      data: {} as Record<string, string>,
+      setData(type: string, val: string) {
+        this.data[type] = val;
+      },
+      getData(type: string) {
+        return this.data[type];
+      },
+      effectAllowed: 'copy',
+    };
+
+    fireEvent.dragStart(requirementCard, { dataTransfer: requirementTransfer });
+    fireEvent.dragOver(dropZone, { dataTransfer: requirementTransfer });
+    fireEvent.drop(dropZone, { dataTransfer: requirementTransfer });
+
+    await waitFor(() => {
+      expect(screen.getAllByText('REQ-1').length).toBeGreaterThan(1);
+    });
   });
 });

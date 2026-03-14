@@ -12,18 +12,11 @@ public class Requirement
 
     [Required]
     [MaxLength(200)]
-    public string Title { get; set; } = string.Empty;
+    public string ReqId { get; set; } = string.Empty;
 
     [Required]
     [MaxLength(4000)]
     public string Description { get; set; } = string.Empty;
-
-    [Required]
-    [MaxLength(100)]
-    public string Type { get; set; } = string.Empty;
-
-    [Required]
-    public RequirementLevel Level { get; set; }
 
     [Required]
     [MaxLength(200)]
@@ -31,6 +24,9 @@ public class Requirement
 
     [Required]
     public string[] Tags { get; set; } = Array.Empty<string>();
+
+    [Required]
+    public string[] AssignedComponents { get; set; } = Array.Empty<string>();
 
     [Required]
     public Guid ProjectId { get; set; }

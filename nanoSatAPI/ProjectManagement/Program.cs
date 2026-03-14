@@ -67,10 +67,37 @@ app.MapGet("/version", (IConfiguration config) =>
 // =======================================   REQUIREMENTS  ============================================= 
 
 
-// Frontend requirements list/detail screens: fetch all requirements for browsing/filtering.
-app.MapGet("/requirements", async (RequirementsDbContext db) =>
-    await db.Requirements.AsNoTracking().OrderBy(r => r.Title).ToListAsync()
-);
+// Frontend requirements list/detail screens: fetch all requirements or filter to one project.
+app.MapGet("/requirements", async (Guid? projectId, RequirementsDbContext db) =>
+{
+    var query = db.Requirements.AsNoTracking();
+    if (projectId.HasValue)
+    {
+        query = query.Where(r => r.ProjectId == projectId.Value);
+    }
+
+    return Results.Ok(await query.OrderBy(r => r.ReqId).ToListAsync());
+});
+
+// Frontend requirements panel + component builder: fetch the requirements attached to one project.
+app.MapGet("/projects/{projectId:guid}/requirements", async (Guid projectId, RequirementsDbContext db) =>
+{
+    var projectExists = await db.Projects
+        .AsNoTracking()
+        .AnyAsync(p => p.Id == projectId);
+    if (!projectExists)
+    {
+        return Results.NotFound(new { error = "Project not found." });
+    }
+
+    var requirements = await db.Requirements
+        .AsNoTracking()
+        .Where(r => r.ProjectId == projectId)
+        .OrderBy(r => r.ReqId)
+        .ToListAsync();
+
+    return Results.Ok(requirements);
+});
 
 // Frontend requirement detail/edit screen: fetch one requirement by id.
 app.MapGet("/requirements/{id:guid}", async (Guid id, RequirementsDbContext db) =>
@@ -97,13 +124,12 @@ app.MapPost("/requirements", async (RequirementCreateDto input, RequirementsDbCo
 
     var requirement = new Requirement
     {
-        Title = input.Title.Trim(),
+        ReqId = input.ReqId.Trim(),
         Description = input.Description.Trim(),
-        Type = input.Type.Trim(),
-        Level = input.Level,
         Subsystem = input.Subsystem.Trim(),
         ProjectId = input.ProjectId,
         Tags = NormalizeTags(input.Tags),
+        AssignedComponents = NormalizeStringArray(input.AssignedComponents),
     };
 
     db.Requirements.Add(requirement);
@@ -134,13 +160,12 @@ app.MapPut("/requirements/{id:guid}", async (Guid id, RequirementUpdateDto input
         return Results.NotFound();
     }
 
-    requirement.Title = input.Title.Trim();
+    requirement.ReqId = input.ReqId.Trim();
     requirement.Description = input.Description.Trim();
-    requirement.Type = input.Type.Trim();
-    requirement.Level = input.Level;
     requirement.Subsystem = input.Subsystem.Trim();
     requirement.ProjectId = input.ProjectId;
     requirement.Tags = NormalizeTags(input.Tags);
+    requirement.AssignedComponents = NormalizeStringArray(input.AssignedComponents);
 
     await db.SaveChangesAsync();
 
@@ -601,41 +626,33 @@ app.Run();
 static bool IsValidRequirementCreate(RequirementCreateDto input)
 {
     return IsValidRequirementFields(
-        input.Title,
+        input.ReqId,
         input.Description,
-        input.Type,
         input.Subsystem,
-        input.ProjectId,
-        input.Tags
+        input.ProjectId
     );
 }
 
 static bool IsValidRequirementUpdate(RequirementUpdateDto input)
 {
     return IsValidRequirementFields(
-        input.Title,
+        input.ReqId,
         input.Description,
-        input.Type,
         input.Subsystem,
-        input.ProjectId,
-        input.Tags
+        input.ProjectId
     );
 }
 
 static bool IsValidRequirementFields(
-    string title,
+    string reqId,
     string description,
-    string type,
     string subsystem,
-    Guid projectId,
-    string[] tags)
+    Guid projectId)
 {
-    return !string.IsNullOrWhiteSpace(title)
+    return !string.IsNullOrWhiteSpace(reqId)
         && !string.IsNullOrWhiteSpace(description)
-        && !string.IsNullOrWhiteSpace(type)
         && !string.IsNullOrWhiteSpace(subsystem)
-        && projectId != Guid.Empty
-        && tags is { Length: > 0 };
+        && projectId != Guid.Empty;
 }
 
 /**

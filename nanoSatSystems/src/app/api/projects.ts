@@ -55,7 +55,6 @@ export type Project = {
   memberIds: string[];
   members?: OrganizationMember[];
   pendingRequests?: string[];
-  requirementsListId: string;
   componentsListId: string;
   timelineId: string;
   integrationsId: string;
@@ -109,7 +108,6 @@ let mockProjects: Project[] = [
     documentIds: [],
     memberIds: ['mock-user'],
     pendingRequests: [],
-    requirementsListId: 'REQ-MOCK-001',
     componentsListId: 'CMP-MOCK-001',
     timelineId: 'TML-MOCK-001',
     integrationsId: 'INT-MOCK-001',
@@ -204,8 +202,6 @@ async function mockRequest<T = JsonValue>(
       documentIds: Array.isArray(body.documentIds) ? (body.documentIds as string[]) : [],
       memberIds: Array.isArray(body.memberIds) ? (body.memberIds as string[]) : [],
       pendingRequests: Array.isArray(body.pendingRequests) ? (body.pendingRequests as string[]) : [],
-      requirementsListId:
-        typeof body.requirementsListId === 'string' ? body.requirementsListId : '',
       componentsListId: typeof body.componentsListId === 'string' ? body.componentsListId : '',
       timelineId: typeof body.timelineId === 'string' ? body.timelineId : '',
       integrationsId: typeof body.integrationsId === 'string' ? body.integrationsId : '',

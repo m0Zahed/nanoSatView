@@ -21,7 +21,13 @@ public class RequirementsDbContext : DbContext
     {
         modelBuilder.Entity<Requirement>(entity =>
         {
+            entity.Property(r => r.ReqId)
+                .HasMaxLength(200);
+
             entity.Property(r => r.Tags)
+                .HasColumnType("text[]");
+
+            entity.Property(r => r.AssignedComponents)
                 .HasColumnType("text[]");
         });
 

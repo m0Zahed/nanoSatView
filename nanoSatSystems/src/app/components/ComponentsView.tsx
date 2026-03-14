@@ -20,6 +20,7 @@ import { Card } from '@/app/components/ui/card';
 import { ScrollArea } from '@/app/components/ui/scroll-area';
 import { Label } from '@/app/components/ui/label';
 import { Textarea } from '@/app/components/ui/textarea';
+import type { ProjectRequirement } from '@/app/api/requirements';
 
 interface Component {
   id: string;
@@ -39,20 +40,36 @@ interface DocumentBlob {
 
 interface BuilderBlob {
   id: string;
-  type: 'text' | 'document' | 'diagram';
+  type: 'text' | 'document' | 'diagram' | 'requirement';
   title: string;
   content: string;
   sourceId?: string;
 }
 
+const TRUTHY_VALUES = new Set(['1', 'true', 'yes', 'on']);
+const REMOTE_LAN_ENABLED = TRUTHY_VALUES.has(
+  String((typeof import.meta !== 'undefined' && (import.meta as any).env?.TESTING_REMOTE_LAN) || '')
+    .trim()
+    .toLowerCase()
+);
+const IS_LOCALHOST_HOSTNAME =
+  typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+const DEFAULT_COMPONENTS_API_BASE = REMOTE_LAN_ENABLED
+  ? `http://${window.location.hostname}:8090`
+  : IS_LOCALHOST_HOSTNAME
+    ? 'http://127.0.0.1:8090'
+    : '/api/components';
 const COMPONENTS_API_BASE =
-  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_COMPONENTS_API_BASE_URL) ||
-  'http://127.0.0.1:8090';
+  ((typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_COMPONENTS_API_BASE_URL) as string | undefined)
+    ?.replace(/\/+$/, '') || DEFAULT_COMPONENTS_API_BASE;
 
 interface ComponentsViewProps {
   projectName: string;
   components: string[];
-  requirements?: string[];
+  requirements?: ProjectRequirement[];
+  requirementsLoading?: boolean;
+  requirementsError?: string | null;
   onAddComponent: (component: string) => void;
   onRemoveComponent: (index: number) => void;
 }
@@ -61,6 +78,8 @@ export function ComponentsView({
   projectName,
   components,
   requirements = [],
+  requirementsLoading = false,
+  requirementsError = null,
   onAddComponent,
   onRemoveComponent,
 }: ComponentsViewProps) {
@@ -103,70 +122,22 @@ export function ComponentsView({
   const [isBuilderDropActive, setIsBuilderDropActive] = useState(false);
   const [isGeneratingMarkdown, setIsGeneratingMarkdown] = useState(false);
 
-  const parsedRequirements = useMemo(
-    () =>
-      requirements.map((raw, index) => {
-        try {
-          const parsed = JSON.parse(raw) as Partial<{
-            Id: string;
-            id: string;
-            Title: string;
-            title: string;
-            Description: string;
-            description: string;
-            Type: string;
-            type: string;
-            Subsystem: string;
-            subsystem: string;
-            Tags: string[];
-            tags: string[];
-          }>;
-          const title = (parsed.Title || parsed.title || '').toString().trim();
-          const description = (parsed.Description || parsed.description || '').toString().trim();
-          const type = (parsed.Type || parsed.type || '').toString().trim();
-          const subsystem = (parsed.Subsystem || parsed.subsystem || '').toString().trim();
-          const tags = Array.isArray(parsed.Tags || parsed.tags)
-            ? ((parsed.Tags || parsed.tags) as string[])
-            : [];
-          return {
-            id: (parsed.Id || parsed.id || `req-${index + 1}`).toString(),
-            title: title || raw,
-            description: description || raw,
-            type: type || 'General',
-            subsystem: subsystem || 'General',
-            tags,
-          };
-        } catch {
-          return {
-            id: `req-${index + 1}`,
-            title: raw,
-            description: raw,
-            type: 'General',
-            subsystem: 'General',
-            tags: [] as string[],
-          };
-        }
-      }),
-    [requirements]
-  );
-
   const filteredRequirements = useMemo(() => {
     const query = requirementsQuery.trim().toLowerCase();
     if (!query) {
-      return parsedRequirements.slice(0, 6);
+      return requirements.slice(0, 20);
     }
-    return parsedRequirements
+    return requirements
       .filter(
         (req) =>
-          req.id.toLowerCase().includes(query) ||
-          req.title.toLowerCase().includes(query) ||
+          req.reqId.toLowerCase().includes(query) ||
           req.description.toLowerCase().includes(query) ||
-          req.type.toLowerCase().includes(query) ||
           req.subsystem.toLowerCase().includes(query) ||
-          req.tags.some((tag) => tag.toLowerCase().includes(query))
+          req.tags.some((tag) => tag.toLowerCase().includes(query)) ||
+          req.assignedComponents.some((component) => component.toLowerCase().includes(query))
       )
       .slice(0, 20);
-  }, [parsedRequirements, requirementsQuery]);
+  }, [requirements, requirementsQuery]);
 
   const parsedComponents: Component[] = components.map((comp, index) => {
     try {
@@ -194,17 +165,33 @@ export function ComponentsView({
   const selectedComponent =
     selectedComponentIndex === null ? null : parsedComponents[selectedComponentIndex] || null;
 
+  const selectedRequirementIds = useMemo(
+    () =>
+      new Set(
+        builderStack
+          .filter((blob) => blob.type === 'requirement' && blob.sourceId)
+          .map((blob) => blob.sourceId as string)
+      ),
+    [builderStack]
+  );
+
+  const requirementsForGeneration = useMemo(() => {
+    if (selectedRequirementIds.size > 0) {
+      return requirements.filter((requirement) => selectedRequirementIds.has(requirement.id));
+    }
+    return filteredRequirements.slice(0, 6);
+  }, [filteredRequirements, requirements, selectedRequirementIds]);
+
   const generatedMarkdown = useMemo(() => {
     if (!selectedComponent) {
       return '# Component Documentation\n\nNo component selected.\n';
     }
 
-    const relatedRequirements = filteredRequirements.slice(0, 6);
     const requirementsBlock =
-      relatedRequirements.length === 0
+      requirementsForGeneration.length === 0
         ? '- No matching requirements found.'
-        : relatedRequirements
-            .map((req) => `- **${req.id}** ${req.title} (${req.type}/${req.subsystem})`)
+        : requirementsForGeneration
+            .map((req) => `- **${req.reqId}** ${req.description} (${req.subsystem})`)
             .join('\n');
 
     return [
@@ -224,7 +211,7 @@ export function ComponentsView({
       'Draft a concise test-readiness summary for this component using the linked requirements.',
       '',
     ].join('\n');
-  }, [selectedComponent, filteredRequirements]);
+  }, [requirementsForGeneration, selectedComponent]);
 
   const [markdownDraft, setMarkdownDraft] = useState(generatedMarkdown);
 
@@ -342,6 +329,20 @@ export function ComponentsView({
     event.dataTransfer.effectAllowed = 'copy';
   };
 
+  const onRequirementDragStart = (
+    event: React.DragEvent<HTMLDivElement>,
+    requirement: ProjectRequirement
+  ) => {
+    event.dataTransfer.setData(
+      'application/json',
+      JSON.stringify({
+        kind: 'requirement-card',
+        id: requirement.id,
+      })
+    );
+    event.dataTransfer.effectAllowed = 'copy';
+  };
+
   const onBuilderDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setIsBuilderDropActive(false);
@@ -351,23 +352,53 @@ export function ComponentsView({
     }
     try {
       const parsed = JSON.parse(raw) as { kind?: string; id?: string };
-      if (parsed.kind !== 'document-card' || !parsed.id) {
+      if (!parsed.id) {
         return;
       }
-      const matchedDoc = documents.find((doc) => doc.id === parsed.id);
-      if (!matchedDoc) {
+
+      if (parsed.kind === 'document-card') {
+        const matchedDoc = documents.find((doc) => doc.id === parsed.id);
+        if (!matchedDoc) {
+          return;
+        }
+        setBuilderStack((prev) => [
+          ...prev,
+          {
+            id: `document-${Date.now()}`,
+            type: 'document',
+            title: matchedDoc.name,
+            content: `Doc ${matchedDoc.id} (${matchedDoc.mimeType}, ${matchedDoc.sizeBytes} bytes)`,
+            sourceId: matchedDoc.id,
+          },
+        ]);
         return;
       }
-      setBuilderStack((prev) => [
-        ...prev,
-        {
-          id: `document-${Date.now()}`,
-          type: 'document',
-          title: matchedDoc.name,
-          content: `Doc ${matchedDoc.id} (${matchedDoc.mimeType}, ${matchedDoc.sizeBytes} bytes)`,
-          sourceId: matchedDoc.id,
-        },
-      ]);
+
+      if (parsed.kind === 'requirement-card') {
+        const matchedRequirement = requirements.find((requirement) => requirement.id === parsed.id);
+        if (!matchedRequirement) {
+          return;
+        }
+        setBuilderStack((prev) => [
+          ...prev,
+          {
+            id: `requirement-${Date.now()}`,
+            type: 'requirement',
+            title: matchedRequirement.reqId,
+            content: [
+              matchedRequirement.description,
+              `Subsystem: ${matchedRequirement.subsystem}`,
+              `Tags: ${matchedRequirement.tags.length > 0 ? matchedRequirement.tags.join(', ') : 'None'}`,
+              `Assigned Components: ${
+                matchedRequirement.assignedComponents.length > 0
+                  ? matchedRequirement.assignedComponents.join(', ')
+                  : 'None'
+              }`,
+            ].join('\n'),
+            sourceId: matchedRequirement.id,
+          },
+        ]);
+      }
     } catch {
       // Ignore malformed drag payload.
     }
@@ -384,7 +415,7 @@ export function ComponentsView({
         body: JSON.stringify({
           projectName,
           component: selectedComponent,
-          requirements: filteredRequirements,
+          requirements: requirementsForGeneration,
           stack: builderStack,
         }),
       });
@@ -413,7 +444,7 @@ export function ComponentsView({
       ...builderStack.map((blob, index) => `### ${index + 1}. [${blob.type.toUpperCase()}] ${blob.title}\n${blob.content}`),
       '',
       '## Requirements Snapshot',
-      ...filteredRequirements.slice(0, 8).map((req) => `- **${req.id}** ${req.title}`),
+      ...requirementsForGeneration.map((req) => `- **${req.reqId}** ${req.description}`),
       '',
     ].join('\n');
     setMarkdownDraft(fallback);
@@ -747,24 +778,41 @@ export function ComponentsView({
                     className="bg-[#0f0f12] border-white/10 text-white rounded-none font-mono"
                   />
                   <div className="text-xs text-gray-400 font-mono">
-                    Returns requirements linked to the selected component.
+                    Searches the full project requirement set. Drag cards into the builder canvas.
                   </div>
-                  <div className="border border-white/10 bg-black/20 max-h-48 overflow-auto">
-                    {filteredRequirements.length === 0 ? (
+                  {requirementsLoading ? (
+                    <div className="text-xs text-gray-500 font-mono">Loading requirements...</div>
+                  ) : null}
+                  {requirementsError ? (
+                    <div className="text-xs text-red-400 font-mono">{requirementsError}</div>
+                  ) : null}
+                  <div className="border border-white/10 bg-black/20 max-h-60 overflow-auto">
+                    {!requirementsLoading && filteredRequirements.length === 0 ? (
                       <div className="p-3 text-xs text-gray-500 font-mono">No matching requirements</div>
                     ) : (
                       filteredRequirements.map((requirement) => (
                         <div
                           key={requirement.id}
-                          className="p-3 border-b border-white/10 last:border-b-0 hover:bg-white/5"
+                          draggable
+                          onDragStart={(event) => onRequirementDragStart(event, requirement)}
+                          className="p-3 border-b border-white/10 last:border-b-0 hover:bg-white/5 cursor-grab active:cursor-grabbing"
+                          data-testid={`requirement-card-${requirement.id}`}
                         >
-                          <p className="text-xs text-gray-400 font-mono">{requirement.id}</p>
-                          <p className="text-sm text-white font-mono mt-1">{requirement.title}</p>
+                          <p className="text-xs text-gray-400 font-mono">{requirement.reqId}</p>
                           <p className="text-xs text-gray-400 font-mono mt-1 line-clamp-2">
                             {requirement.description}
                           </p>
                           <p className="text-[11px] text-gray-500 font-mono mt-1">
-                            {requirement.type} - {requirement.subsystem}
+                            {requirement.subsystem}
+                          </p>
+                          <p className="text-[11px] text-gray-500 font-mono mt-1">
+                            Tags: {requirement.tags.length > 0 ? requirement.tags.join(', ') : 'None'}
+                          </p>
+                          <p className="text-[11px] text-gray-500 font-mono mt-1">
+                            Assigned: {requirement.assignedComponents.length > 0 ? requirement.assignedComponents.join(', ') : 'None'}
+                          </p>
+                          <p className="text-[11px] text-gray-500 font-mono mt-1">
+                            Drag into Document Builder canvas
                           </p>
                         </div>
                       ))
@@ -918,7 +966,9 @@ export function ComponentsView({
                       data-testid="builder-drop-zone"
                     >
                       {builderStack.length === 0 ? (
-                        <div className="text-xs text-gray-500">Drop document cards here to build your stack.</div>
+                        <div className="text-xs text-gray-500">
+                          Drop document or requirement cards here to build your stack.
+                        </div>
                       ) : (
                         builderStack.map((blob, index) => (
                           <div

@@ -24,6 +24,13 @@ import { ProjectMembersDialog } from '@/app/components/ProjectMembersDialog';
 import { canAccessKafkaMonitor } from '@/app/utils/kafkaMonitorAccess';
 import { useAuth, type User } from '@/app/auth/AuthContext';
 import {
+  createRequirement as apiCreateRequirement,
+  deleteRequirement as apiDeleteRequirement,
+  fetchProjectRequirements,
+  type ProjectRequirement,
+  type RequirementPayload,
+} from '@/app/api/requirements';
+import {
   createOrganization as apiCreateOrganization,
   createProject as apiCreateProject,
   deleteProject as apiDeleteProject,
@@ -51,7 +58,7 @@ interface Project {
   organizationId: string;
   personalProject?: boolean;
   members?: Member[];
-  requirements?: string[];
+  requirements?: ProjectRequirement[];
   timeline?: string;
   components?: string[];
 }
@@ -178,6 +185,9 @@ export function Dashboard() {
   const [isProjectSidebarVisible, setIsProjectSidebarVisible] = useState(true);
   const [currentPage, setCurrentPage] = useState<'dashboard' | 'systems' | 'view'>('dashboard');
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+  const [requirementsLoadedByProject, setRequirementsLoadedByProject] = useState<Record<string, boolean>>({});
+  const [requirementsLoadingByProject, setRequirementsLoadingByProject] = useState<Record<string, boolean>>({});
+  const [requirementsErrorByProject, setRequirementsErrorByProject] = useState<Record<string, string | null>>({});
 
   // Organization member directory
   const [members, setMembers] = useState<Member[]>([]);
@@ -278,7 +288,7 @@ export function Dashboard() {
               members: (p.memberIds || [])
                 .map((memberId) => memberMap.get(memberId))
                 .filter((member): member is Member => Boolean(member)),
-              requirements: p.requirementsListId ? [p.requirementsListId] : [],
+              requirements: [],
               timeline: p.timelineId || '',
               components: p.componentsListId ? [p.componentsListId] : [],
             }))
@@ -382,7 +392,7 @@ export function Dashboard() {
             organizationId: p.organizationId || 'personal',
             personalProject: p.personalProject || p.organizationId === 'personal',
             members: currentUserMember ? [currentUserMember] : [],
-            requirements: p.requirementsListId ? [p.requirementsListId] : [],
+            requirements: [],
             timeline: p.timelineId || '',
             components: p.componentsListId ? [p.componentsListId] : [],
           }));
@@ -399,6 +409,55 @@ export function Dashboard() {
   }, [user]);
 
   const currentUserId = useMemo(() => user?.id ?? user?.email ?? 'me', [user]);
+
+  const loadRequirementsForProject = async (projectId: string) => {
+    setRequirementsLoadingByProject((previous) => ({ ...previous, [projectId]: true }));
+    setRequirementsErrorByProject((previous) => ({ ...previous, [projectId]: null }));
+
+    const { status, data } = await fetchProjectRequirements(projectId);
+    if (status === 200 && Array.isArray(data)) {
+      const projectRequirements = data as ProjectRequirement[];
+      setProjects((previous) =>
+        previous.map((project) =>
+          project.id === projectId
+            ? {
+                ...project,
+                requirements: projectRequirements,
+              }
+            : project
+        )
+      );
+      setRequirementsLoadedByProject((previous) => ({ ...previous, [projectId]: true }));
+      setRequirementsLoadingByProject((previous) => ({ ...previous, [projectId]: false }));
+      return;
+    }
+
+    const errorMessage =
+      data && typeof data === 'object' && 'error' in data && data.error && typeof data.error === 'object' && 'message' in data.error
+        ? String(data.error.message)
+        : 'Failed to load requirements.';
+
+    setRequirementsErrorByProject((previous) => ({ ...previous, [projectId]: errorMessage }));
+    setRequirementsLoadingByProject((previous) => ({ ...previous, [projectId]: false }));
+  };
+
+  useEffect(() => {
+    if (
+      !selectedProjectId ||
+      requirementsLoadedByProject[selectedProjectId] ||
+      requirementsLoadingByProject[selectedProjectId] ||
+      requirementsErrorByProject[selectedProjectId]
+    ) {
+      return;
+    }
+
+    const selectedProjectExists = projects.some((project) => project.id === selectedProjectId);
+    if (!selectedProjectExists) {
+      return;
+    }
+
+    void loadRequirementsForProject(selectedProjectId);
+  }, [projects, requirementsErrorByProject, requirementsLoadedByProject, requirementsLoadingByProject, selectedProjectId]);
   
   // Create a new organisation 
   const handleCreateOrganization = async () => {
@@ -483,7 +542,7 @@ export function Dashboard() {
             organizationId: p.organizationId || op.organizationId || 'personal',
             personalProject: p.personalProject || (p.organizationId || op.organizationId) === 'personal',
             members: members,
-            requirements: p.requirementsListId ? [p.requirementsListId] : [],
+            requirements: [],
             timeline: p.timelineId || '',
             components: p.componentsListId ? [p.componentsListId] : [],
           }))
@@ -518,7 +577,6 @@ export function Dashboard() {
       isPublic: false,
       organizationId: selectedOrgId ?? 'personal',
       personalProject: (selectedOrgId ?? 'personal') === 'personal',
-      requirementsListId: '',
       componentsListId: '',
       timelineId: '',
       integrationsId: '',
@@ -537,6 +595,9 @@ export function Dashboard() {
         organizationId: projData.organizationId || selectedOrgId || 'personal',
         personalProject: projData.personalProject || projData.organizationId === 'personal',
         members: members,
+        requirements: [],
+        timeline: projData.timelineId || '',
+        components: projData.componentsListId ? [projData.componentsListId] : [],
       };
       
       // Set the projects list
@@ -681,44 +742,73 @@ export function Dashboard() {
   };
 
   const handleOpenAddRequirements = (projectId: string) => {
+    setRequirementsLoadedByProject((previous) => ({ ...previous, [projectId]: false }));
+    setRequirementsErrorByProject((previous) => ({ ...previous, [projectId]: null }));
     setSelectedProjectId(projectId);
     setCurrentView('requirements');
   };
   
-  const handleAddRequirementInView = (requirement: string) => {
-    if (!selectedProjectId) return;
+  const handleAddRequirementInView = async (requirement: RequirementPayload) => {
+    if (!selectedProjectId) {
+      return false;
+    }
 
-    setProjects(projects.map((project) => {
-      if (project.id === selectedProjectId) {
-        const currentRequirements = project.requirements || [];
-        return {
-          ...project,
-          requirements: [...currentRequirements, requirement],
-        };
-      }
-      return project;
-    }));
+    const { status, data } = await apiCreateRequirement({
+      ...requirement,
+      projectId: selectedProjectId,
+    });
 
-    setAlertMessage('Requirement added successfully!');
+    if (status === 201 && data && typeof data === 'object' && 'id' in data) {
+      const createdRequirement = data as ProjectRequirement;
+      setProjects((previous) =>
+        previous.map((project) => {
+          if (project.id !== selectedProjectId) {
+            return project;
+          }
+          const currentRequirements = project.requirements || [];
+          return {
+            ...project,
+            requirements: [...currentRequirements, createdRequirement],
+          };
+        })
+      );
+      setRequirementsLoadedByProject((previous) => ({ ...previous, [selectedProjectId]: true }));
+      setAlertMessage('Requirement added successfully!');
+      setShowSuccessAlert(true);
+      return true;
+    }
+
+    setAlertMessage('Failed to add requirement.');
     setShowSuccessAlert(true);
+    return false;
   };
 
-  const handleRemoveRequirement = (index: number) => {
-    if (!selectedProjectId) return;
+  const handleRemoveRequirement = async (requirementId: string) => {
+    if (!selectedProjectId) {
+      return false;
+    }
 
-    setProjects(projects.map((project) => {
-      if (project.id === selectedProjectId) {
-        const currentRequirements = project.requirements || [];
-        return {
-          ...project,
-          requirements: currentRequirements.filter((_, i) => i !== index),
-        };
-      }
-      return project;
-    }));
+    const { status } = await apiDeleteRequirement(requirementId);
+    if (status === 204) {
+      setProjects((previous) =>
+        previous.map((project) => {
+          if (project.id !== selectedProjectId) {
+            return project;
+          }
+          return {
+            ...project,
+            requirements: (project.requirements || []).filter((requirement) => requirement.id !== requirementId),
+          };
+        })
+      );
+      setAlertMessage('Requirement removed successfully!');
+      setShowSuccessAlert(true);
+      return true;
+    }
 
-    setAlertMessage('Requirement removed successfully!');
+    setAlertMessage('Failed to remove requirement.');
     setShowSuccessAlert(true);
+    return false;
   };
 
   const handleOpenAddTimeline = (projectId: string) => {
@@ -755,6 +845,8 @@ export function Dashboard() {
   };
 
   const handleOpenAddComponents = (projectId: string) => {
+    setRequirementsLoadedByProject((previous) => ({ ...previous, [projectId]: false }));
+    setRequirementsErrorByProject((previous) => ({ ...previous, [projectId]: null }));
     setSelectedProjectId(projectId);
     setCurrentView('components');
   };
@@ -798,6 +890,12 @@ export function Dashboard() {
   const selectedOrg = organizations.find((org) => org.id === selectedOrgId);
   const currentProjects = projects.filter((p) => p.organizationId === selectedOrgId);
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
+  const selectedProjectRequirementsLoading = selectedProjectId
+    ? Boolean(requirementsLoadingByProject[selectedProjectId])
+    : false;
+  const selectedProjectRequirementsError = selectedProjectId
+    ? requirementsErrorByProject[selectedProjectId] || null
+    : null;
   const currentOrgJoinRequests = orgJoinRequests.filter((req) => req.organizationId === selectedOrgId);
 
   return (
@@ -938,6 +1036,9 @@ export function Dashboard() {
               projectName={selectedProject.name}
               projectId={selectedProject.id}
               requirements={selectedProject.requirements || []}
+              components={selectedProject.components || []}
+              requirementsLoading={selectedProjectRequirementsLoading}
+              requirementsError={selectedProjectRequirementsError}
               onAddRequirement={handleAddRequirementInView}
               onRemoveRequirement={handleRemoveRequirement}
             />
@@ -952,6 +1053,8 @@ export function Dashboard() {
               projectName={selectedProject.name}
               components={selectedProject.components || []}
               requirements={selectedProject.requirements || []}
+              requirementsLoading={selectedProjectRequirementsLoading}
+              requirementsError={selectedProjectRequirementsError}
               onAddComponent={handleAddComponentInView}
               onRemoveComponent={handleRemoveComponent}
             />

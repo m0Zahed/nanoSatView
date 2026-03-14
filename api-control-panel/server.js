@@ -14,6 +14,7 @@ const KAFKA_CLIENT_ID = process.env.KAFKA_CLIENT_ID || 'nanoSatView-api-control-
 const KAFKA_LOG_LEVEL_NAME = (process.env.KAFKA_LOG_LEVEL || 'NOTHING').toUpperCase();
 const KAFKA_LOG_LEVEL = logLevel[KAFKA_LOG_LEVEL_NAME] ?? logLevel.NOTHING;
 const PROJECT_MANAGEMENT_ADMIN_URL = process.env.PROJECT_MANAGEMENT_ADMIN_URL || 'http://127.0.0.1:5001';
+const COMPONENT_COMPOSER_PREINSTALL = String(process.env.COMPONENT_COMPOSER_PREINSTALL || '').toLowerCase() === 'true';
 
 const kafka = new Kafka({
   clientId: KAFKA_CLIENT_ID,
@@ -321,6 +322,37 @@ const runCommand = (command, args, options = {}) =>
     });
   });
 
+const isPidAlive = (pid) => {
+  if (!pid) {
+    return false;
+  }
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (_) {
+    return false;
+  }
+};
+
+const stopProcessByPid = async (pid) => {
+  if (!pid) {
+    return;
+  }
+  if (process.platform === 'win32') {
+    await runCommand('taskkill', ['/PID', String(pid), '/T', '/F'], { shell: true });
+    return;
+  }
+  try {
+    process.kill(pid, 'SIGTERM');
+  } catch (_) {}
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  if (isPidAlive(pid)) {
+    try {
+      process.kill(pid, 'SIGKILL');
+    } catch (_) {}
+  }
+};
+
 const isPortListening = (port, host = '127.0.0.1', timeoutMs = 600) =>
   new Promise((resolve) => {
     const socket = new net.Socket();
@@ -355,20 +387,27 @@ const stopWindowsProcessByPort = async (port) => {
 let composerDepsInstalled = false;
 
 const ensureComponentComposerDependencies = async () => {
+  if (!COMPONENT_COMPOSER_PREINSTALL) {
+    appendServiceLog(
+      'component-composer',
+      'stdout',
+      'Skipping dependency auto-install. Set COMPONENT_COMPOSER_PREINSTALL=true to enable preinstall.'
+    );
+    return;
+  }
+  if (composerDepsInstalled) {
+    return;
+  }
   if (!fs.existsSync(componentComposerVenvPython)) {
-    await runCommandWithLogs('component-composer', 'python', ['-m', 'venv', '.venv'], {
-      cwd: componentComposerDir,
-    });
+    await runCommandWithLogs('component-composer', 'python', ['-m', 'venv', '.venv'], { cwd: componentComposerDir });
   }
-  if (!composerDepsInstalled) {
-    await runCommandWithLogs('component-composer', componentComposerVenvPython, ['-m', 'pip', 'install', '--upgrade', 'pip'], {
-      cwd: componentComposerDir,
-    });
-    await runCommandWithLogs('component-composer', componentComposerVenvPython, ['-m', 'pip', 'install', '-r', 'requirements.txt'], {
-      cwd: componentComposerDir,
-    });
-    composerDepsInstalled = true;
-  }
+  await runCommandWithLogs('component-composer', componentComposerVenvPython, ['-m', 'pip', 'install', '--upgrade', 'pip'], {
+    cwd: componentComposerDir,
+  });
+  await runCommandWithLogs('component-composer', componentComposerVenvPython, ['-m', 'pip', 'install', '-r', 'requirements.txt'], {
+    cwd: componentComposerDir,
+  });
+  composerDepsInstalled = true;
 };
 
 const ensureNodeDependencies = async (service) => {
@@ -421,7 +460,7 @@ const startServiceProcess = async (serviceId) => {
     let launchCommand = definition.command;
     const launchArgs = [...definition.args];
     if (definition.id === 'component-composer') {
-      launchCommand = componentComposerVenvPython;
+      launchCommand = fs.existsSync(componentComposerVenvPython) ? componentComposerVenvPython : definition.command;
     }
 
     const child = spawn(launchCommand, launchArgs, {
@@ -482,9 +521,17 @@ const stopServiceProcess = async (serviceId) => {
   appendServiceLog(serviceId, 'stdout', `Stopping ${definition.name}...`);
   broadcastServiceUpdate();
   const processRef = state.process;
+  const trackedPid = processRef?.pid ?? null;
 
   try {
-    await stopChildProcess(processRef);
+    if (trackedPid) {
+      await stopProcessByPid(trackedPid).catch((error) => {
+        appendServiceLog(serviceId, 'stderr', `PID stop failed for ${trackedPid}: ${error.message}`);
+      });
+    }
+    if (processRef && isPidAlive(processRef.pid)) {
+      await stopChildProcess(processRef);
+    }
     if (process.platform === 'win32' && definition.port) {
       const stillListening = await isPortListening(definition.port);
       if (stillListening) {
@@ -569,7 +616,15 @@ const stopKafkaProcess = async () => {
 
   if (kafkaProcess) {
     const processRef = kafkaProcess;
-    await stopChildProcess(processRef);
+    const trackedPid = processRef?.pid ?? null;
+    if (trackedPid) {
+      await stopProcessByPid(trackedPid).catch((error) => {
+        appendKafkaProcessLog('stderr', `PID stop failed for ${trackedPid}: ${error.message}`);
+      });
+    }
+    if (processRef && isPidAlive(processRef.pid)) {
+      await stopChildProcess(processRef);
+    }
     kafkaProcess = null;
     kafkaProcessStartTime = null;
     appendKafkaProcessLog('stdout', 'Kafka process stop requested.');

@@ -14,7 +14,7 @@ const KAFKA_CLIENT_ID = process.env.KAFKA_CLIENT_ID || 'nanoSatView-api-control-
 const KAFKA_LOG_LEVEL_NAME = (process.env.KAFKA_LOG_LEVEL || 'NOTHING').toUpperCase();
 const KAFKA_LOG_LEVEL = logLevel[KAFKA_LOG_LEVEL_NAME] ?? logLevel.NOTHING;
 const PROJECT_MANAGEMENT_ADMIN_URL = process.env.PROJECT_MANAGEMENT_ADMIN_URL || 'http://127.0.0.1:5001';
-const COMPONENT_COMPOSER_PREINSTALL = String(process.env.COMPONENT_COMPOSER_PREINSTALL || '').toLowerCase() === 'true';
+const COMPONENT_COMPOSER_PREINSTALL = String(process.env.COMPONENT_COMPOSER_PREINSTALL || 'true').toLowerCase() !== 'false';
 
 const kafka = new Kafka({
   clientId: KAFKA_CLIENT_ID,
@@ -387,19 +387,15 @@ const stopWindowsProcessByPort = async (port) => {
 let composerDepsInstalled = false;
 
 const ensureComponentComposerDependencies = async () => {
+  if (!fs.existsSync(componentComposerVenvPython)) {
+    await runCommandWithLogs('component-composer', 'python', ['-m', 'venv', '.venv'], { cwd: componentComposerDir });
+  }
   if (!COMPONENT_COMPOSER_PREINSTALL) {
-    appendServiceLog(
-      'component-composer',
-      'stdout',
-      'Skipping dependency auto-install. Set COMPONENT_COMPOSER_PREINSTALL=true to enable preinstall.'
-    );
+    appendServiceLog('component-composer', 'stdout', 'Skipping dependency auto-install (COMPONENT_COMPOSER_PREINSTALL=false).');
     return;
   }
   if (composerDepsInstalled) {
     return;
-  }
-  if (!fs.existsSync(componentComposerVenvPython)) {
-    await runCommandWithLogs('component-composer', 'python', ['-m', 'venv', '.venv'], { cwd: componentComposerDir });
   }
   await runCommandWithLogs('component-composer', componentComposerVenvPython, ['-m', 'pip', 'install', '--upgrade', 'pip'], {
     cwd: componentComposerDir,
@@ -460,7 +456,10 @@ const startServiceProcess = async (serviceId) => {
     let launchCommand = definition.command;
     const launchArgs = [...definition.args];
     if (definition.id === 'component-composer') {
-      launchCommand = fs.existsSync(componentComposerVenvPython) ? componentComposerVenvPython : definition.command;
+      if (!fs.existsSync(componentComposerVenvPython)) {
+        throw new Error('Component Composer virtual environment is missing. Start again to initialize .venv.');
+      }
+      launchCommand = componentComposerVenvPython;
     }
 
     const child = spawn(launchCommand, launchArgs, {

@@ -15,6 +15,8 @@ const KAFKA_LOG_LEVEL_NAME = (process.env.KAFKA_LOG_LEVEL || 'NOTHING').toUpperC
 const KAFKA_LOG_LEVEL = logLevel[KAFKA_LOG_LEVEL_NAME] ?? logLevel.NOTHING;
 const PROJECT_MANAGEMENT_ADMIN_URL = process.env.PROJECT_MANAGEMENT_ADMIN_URL || 'http://127.0.0.1:5001';
 const COMPONENT_COMPOSER_PREINSTALL = String(process.env.COMPONENT_COMPOSER_PREINSTALL || 'true').toLowerCase() !== 'false';
+const DOCUMENT_PROCESSOR_JAVA_HOME = process.env.DOCUMENT_PROCESSOR_JAVA_HOME || 'D:\\Program Files\\Java';
+const DOCUMENT_PROCESSOR_JAVA_PATH = `${path.join(DOCUMENT_PROCESSOR_JAVA_HOME, 'bin')};${process.env.Path || ''}`;
 
 const kafka = new Kafka({
   clientId: KAFKA_CLIENT_ID,
@@ -166,6 +168,10 @@ const serviceDefinitions = [
     cwd: documentProcessorDir,
     command: 'mvn',
     args: ['spring-boot:run'],
+    env: {
+      JAVA_HOME: DOCUMENT_PROCESSOR_JAVA_HOME,
+      Path: DOCUMENT_PROCESSOR_JAVA_PATH,
+    },
   },
   {
     id: 'component-composer',
@@ -417,9 +423,16 @@ const ensureNodeDependencies = async (service) => {
 
 const ensureJdkAvailable = async () => {
   try {
-    await runCommand('javac', ['-version'], { shell: true });
+    await runCommand('javac', ['-version'], {
+      shell: true,
+      env: {
+        ...process.env,
+        JAVA_HOME: DOCUMENT_PROCESSOR_JAVA_HOME,
+        Path: DOCUMENT_PROCESSOR_JAVA_PATH,
+      },
+    });
   } catch (error) {
-    throw new Error(`JDK not available (missing javac): ${error.message}`);
+    throw new Error(`JDK not available for document processor (JAVA_HOME=${DOCUMENT_PROCESSOR_JAVA_HOME}): ${error.message}`);
   }
 };
 

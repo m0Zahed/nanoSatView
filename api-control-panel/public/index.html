@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>API Control Panel</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="topbar">
+        <div>
+          <h1>nanoSatView Control Panel</h1>
+          <p>Service controls and testing tools</p>
+        </div>
+        <div class="topbar-actions">
+          <button id="nav-back" class="btn btn-secondary">Back</button>
+          <button id="nav-forward" class="btn btn-secondary">Forward</button>
+          <button id="open-project-admin" class="btn btn-secondary">Project Admin</button>
+          <button id="open-client-app" class="btn btn-secondary">Client App</button>
+        </div>
+      </header>
+
+      <section class="panel">
+        <header class="panel-header">
+          <h2>APIs and Client Servers</h2>
+          <button id="refresh-services" class="btn">Refresh</button>
+        </header>
+        <div class="services-layout">
+          <div id="services" class="panel-body">Loading services...</div>
+          <aside id="service-logs" class="panel-body service-logs-panel">Select a service and click "View Logs".</aside>
+        </div>
+      </section>
+
+      <section class="panel">
+        <header class="panel-header">
+          <h2>Kafka</h2>
+          <div class="row-actions">
+            <button id="start-kafka" class="btn">Start Kafka</button>
+            <button id="stop-kafka" class="btn btn-danger">Stop Kafka</button>
+            <button id="kafka-details-toggle" class="btn btn-secondary">More Details</button>
+          </div>
+        </header>
+        <div id="kafka-summary" class="panel-body">Loading Kafka status...</div>
+        <div id="kafka-details" class="panel-body hidden"></div>
+      </section>
+
+      <section class="panel">
+        <header class="panel-header">
+          <h2>Tools</h2>
+          <p class="muted">Testing tools are separated here.</p>
+        </header>
+        <div class="tools-grid">
+          <article class="tool-card">
+            <h3>Project Management Schema</h3>
+            <button id="check-schema" class="btn">Check Schema</button>
+            <pre id="schema-output" class="tool-output">Not checked yet.</pre>
+          </article>
+          <article class="tool-card">
+            <h3>Kafka Topics</h3>
+            <button id="check-topics" class="btn">Check Topics</button>
+            <pre id="topics-output" class="tool-output">Not checked yet.</pre>
+          </article>
+          <article class="tool-card">
+            <h3>Kafka Consumer Groups</h3>
+            <button id="check-groups" class="btn">Check Groups</button>
+            <pre id="groups-output" class="tool-output">Not checked yet.</pre>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

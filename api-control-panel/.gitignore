@@ -1,0 +1,4 @@
+node_modules/
+runtime/kafka-logs/
+*.log
+npm-debug.log*

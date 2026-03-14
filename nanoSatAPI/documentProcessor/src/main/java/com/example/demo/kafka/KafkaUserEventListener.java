@@ -16,15 +16,18 @@ public class KafkaUserEventListener {
     private final MonitoringStateService monitoringStateService;
     private final String userCreatedTopic;
     private final String diagramSavedTopic;
+    private final String componentEditedTopic;
 
     public KafkaUserEventListener(
         MonitoringStateService monitoringStateService,
         @Value("${app.kafka.topic.user-created}") String userCreatedTopic,
-        @Value("${app.kafka.topic.diagram-saved}") String diagramSavedTopic
+        @Value("${app.kafka.topic.diagram-saved}") String diagramSavedTopic,
+        @Value("${app.kafka.topic.component-edited}") String componentEditedTopic
     ) {
         this.monitoringStateService = monitoringStateService;
         this.userCreatedTopic = userCreatedTopic;
         this.diagramSavedTopic = diagramSavedTopic;
+        this.componentEditedTopic = componentEditedTopic;
     }
 
     @KafkaListener(topics = "${app.kafka.topic.user-created}", groupId = "${spring.kafka.consumer.group-id}")
@@ -45,5 +48,15 @@ public class KafkaUserEventListener {
             event.diagramId()
         );
         monitoringStateService.recordKafkaConsumed(diagramSavedTopic);
+    }
+
+    @KafkaListener(topics = "${app.kafka.topic.component-edited}", groupId = "${spring.kafka.consumer.group-id}")
+    public void onComponentEdited(ComponentEditedKafkaEvent event) {
+        logger.info(
+            "Kafka listener received component-edited event for component {} in project {}",
+            event.componentName(),
+            event.projectId()
+        );
+        monitoringStateService.recordKafkaConsumed(componentEditedTopic);
     }
 }

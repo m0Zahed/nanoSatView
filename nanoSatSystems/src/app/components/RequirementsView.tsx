@@ -22,7 +22,6 @@ interface RequirementDraft {
   description: string;
   subsystem: string;
   tags: string[];
-  assignedComponents: string[];
 }
 
 interface ValidationIssue {
@@ -40,7 +39,6 @@ interface RequirementsViewProps {
   projectName: string;
   projectId?: string;
   requirements: ProjectRequirement[];
-  components?: string[];
   requirementsLoading?: boolean;
   requirementsError?: string | null;
   onAddRequirement: (requirement: RequirementPayload) => Promise<boolean>;
@@ -53,16 +51,6 @@ function normalizeStringArray(value: string) {
     .map((entry) => entry.trim())
     .filter(Boolean)
     .filter((entry, index, items) => items.findIndex((candidate) => candidate.toLowerCase() === entry.toLowerCase()) === index);
-}
-
-function parseComponentName(raw: string, index: number) {
-  try {
-    const parsed = JSON.parse(raw) as Partial<{ name: string }>;
-    const name = typeof parsed.name === 'string' ? parsed.name.trim() : '';
-    return name || `Component ${index + 1}`;
-  } catch {
-    return raw.trim() || `Component ${index + 1}`;
-  }
 }
 
 function validateGeneratedRequirements(payload: string, projectId: string): ValidationResult {
@@ -99,21 +87,10 @@ function validateGeneratedRequirements(payload: string, projectId: string): Vali
     const description = String(obj.Description ?? obj.description ?? '').trim();
     const subsystem = String(obj.Subsystem ?? obj.subsystem ?? '').trim();
     const tagsSource = obj.Tags ?? obj.tags ?? [];
-    const assignedComponentsSource = obj.AssignedComponents ?? obj.assignedComponents ?? [];
-
     const tags = Array.isArray(tagsSource)
       ? tagsSource.filter((tag): tag is string => typeof tag === 'string').map((tag) => tag.trim()).filter(Boolean)
       : typeof tagsSource === 'string'
         ? normalizeStringArray(tagsSource)
-        : [];
-
-    const assignedComponents = Array.isArray(assignedComponentsSource)
-      ? assignedComponentsSource
-          .filter((component): component is string => typeof component === 'string')
-          .map((component) => component.trim())
-          .filter(Boolean)
-      : typeof assignedComponentsSource === 'string'
-        ? normalizeStringArray(assignedComponentsSource)
         : [];
 
     if (!reqId) {
@@ -143,7 +120,6 @@ function validateGeneratedRequirements(payload: string, projectId: string): Vali
       description,
       subsystem,
       tags,
-      assignedComponents,
       projectId,
     });
   });
@@ -155,7 +131,6 @@ export function RequirementsView({
   projectName,
   projectId,
   requirements,
-  components = [],
   requirementsLoading = false,
   requirementsError = null,
   onAddRequirement,
@@ -168,10 +143,8 @@ export function RequirementsView({
     description: '',
     subsystem: 'General',
     tags: [],
-    assignedComponents: [],
   });
   const [tagsInput, setTagsInput] = useState('');
-  const [assignedComponentsInput, setAssignedComponentsInput] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [isSavingRequirement, setIsSavingRequirement] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -183,14 +156,6 @@ export function RequirementsView({
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [isImportingRequirements, setIsImportingRequirements] = useState(false);
   const [removingRequirementId, setRemovingRequirementId] = useState<string | null>(null);
-
-  const availableComponentNames = useMemo(
-    () =>
-      Array.from(new Set(components.map((component, index) => parseComponentName(component, index)).filter(Boolean))).sort(
-        (a, b) => a.localeCompare(b)
-      ),
-    [components]
-  );
 
   const filteredRequirements = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -214,10 +179,8 @@ export function RequirementsView({
       description: '',
       subsystem: 'General',
       tags: [],
-      assignedComponents: [],
     });
     setTagsInput('');
-    setAssignedComponentsInput('');
   };
 
   const stageExtractorFiles = (files: File[]) => {
@@ -253,7 +216,6 @@ export function RequirementsView({
       description,
       subsystem,
       tags: normalizeStringArray(tagsInput),
-      assignedComponents: normalizeStringArray(assignedComponentsInput),
       projectId: fallbackProjectId,
     });
     setIsSavingRequirement(false);
@@ -295,19 +257,6 @@ export function RequirementsView({
     setExtractorFiles([]);
     setExtractorReferences([]);
     setIsExtractorDialogOpen(false);
-  };
-
-  const toggleAssignedComponent = (componentName: string) => {
-    const nextAssignedComponents = draft.assignedComponents.some(
-      (assignedComponent) => assignedComponent.toLowerCase() === componentName.toLowerCase()
-    )
-      ? draft.assignedComponents.filter(
-          (assignedComponent) => assignedComponent.toLowerCase() !== componentName.toLowerCase()
-        )
-      : [...draft.assignedComponents, componentName];
-
-    setDraft((previous) => ({ ...previous, assignedComponents: nextAssignedComponents }));
-    setAssignedComponentsInput(nextAssignedComponents.join(', '));
   };
 
   return (
@@ -369,46 +318,7 @@ export function RequirementsView({
                     }}
                     className="bg-[#1a1a1a] border-white/10 text-white rounded-none font-mono"
                   />
-                  <Input
-                    placeholder="Assigned components (comma separated)"
-                    value={assignedComponentsInput}
-                    onChange={(event) => {
-                      setAssignedComponentsInput(event.target.value);
-                      setDraft((previous) => ({
-                        ...previous,
-                        assignedComponents: normalizeStringArray(event.target.value),
-                      }));
-                    }}
-                    className="bg-[#1a1a1a] border-white/10 text-white rounded-none font-mono"
-                  />
                 </div>
-
-                {availableComponentNames.length > 0 ? (
-                  <div className="space-y-2">
-                    <p className="text-xs text-gray-400 font-mono">Project components</p>
-                    <div className="flex flex-wrap gap-2">
-                      {availableComponentNames.map((componentName) => {
-                        const isAssigned = draft.assignedComponents.some(
-                          (assignedComponent) => assignedComponent.toLowerCase() === componentName.toLowerCase()
-                        );
-                        return (
-                          <button
-                            key={componentName}
-                            type="button"
-                            onClick={() => toggleAssignedComponent(componentName)}
-                            className={`px-2 py-1 text-xs font-mono border rounded-none transition-colors ${
-                              isAssigned
-                                ? 'border-white/40 bg-white/10 text-white'
-                                : 'border-white/10 text-gray-400 hover:bg-white/5'
-                            }`}
-                          >
-                            {componentName}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : null}
 
                 <div className="flex gap-2">
                   <Button
@@ -704,7 +614,7 @@ export function RequirementsView({
               <Textarea
                 value={generatedJsonInput}
                 onChange={(event) => setGeneratedJsonInput(event.target.value)}
-                placeholder='[{"ReqId":"REQ-001","Description":"Support deployment sequence telemetry.","Subsystem":"Avionics","Tags":["telemetry"],"AssignedComponents":["OBC"]}]'
+                placeholder='[{"ReqId":"REQ-001","Description":"Support deployment sequence telemetry.","Subsystem":"Avionics","Tags":["telemetry"]}]'
                 className="min-h-56 bg-[#222222] border-white/10 text-white rounded-none font-mono"
               />
             </div>

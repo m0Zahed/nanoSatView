@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { fetchMonitoringSnapshot, type MonitoringSnapshot, type RequestTrace } from '@/app/api/monitoring';
+import {
+  fetchMonitoringSnapshot,
+  type ComponentEditedKafkaEvent,
+  type MonitoringSnapshot,
+  type RequestTrace,
+} from '@/app/api/monitoring';
 import { useAuth } from '@/app/auth/AuthContext';
 import { Button } from '@/app/components/ui/button';
 import { Badge } from '@/app/components/ui/badge';
@@ -149,6 +154,46 @@ function RequestList({
   );
 }
 
+function ComponentEventList({ rows }: { rows: ComponentEditedKafkaEvent[] }) {
+  return (
+    <section className="bg-[#222222] border border-white/10 p-4 rounded-none">
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <h2 className="text-white font-mono text-base flex items-center gap-2">
+          <Activity className="h-4 w-4" />
+          Component Edit Kafka Log
+        </h2>
+        <Badge className="rounded-none">{rows.length}</Badge>
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="text-xs text-gray-400 font-mono">No component edit events yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {rows.map((event, index) => (
+            <div key={`${event.componentId}-${event.eventTime}-${index}`} className="border border-white/10 bg-[#1a1a1a] p-3">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-2 text-xs font-mono text-gray-300">
+                <span className="text-gray-400">{formatDateTime(event.eventTime)}</span>
+                <span>
+                  <span className="text-gray-500">Editor:</span> {event.editorName || event.editorId}
+                </span>
+                <span>
+                  <span className="text-gray-500">Action:</span> {event.action}
+                </span>
+                <span>
+                  <span className="text-gray-500">Component:</span> {event.componentName}
+                </span>
+                <span>
+                  <span className="text-gray-500">Project:</span> {event.projectId}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function AdminKafkaMonitorPage() {
   const { user } = useAuth();
   const [snapshot, setSnapshot] = useState<MonitoringSnapshot | null>(null);
@@ -273,6 +318,8 @@ export function AdminKafkaMonitorPage() {
                 <p className="font-mono text-lg">{snapshot.diagramStorage.totalFiles}</p>
               </div>
             </section>
+
+            <ComponentEventList rows={snapshot.recentComponentEvents || []} />
 
             <section className="bg-[#222222] border border-white/10 p-4 rounded-none">
               <h2 className="text-white font-mono text-base flex items-center gap-2 mb-3">

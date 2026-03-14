@@ -5,6 +5,7 @@ import com.example.demo.diagram.DiagramSaveResponse;
 import com.example.demo.diagram.DiagramSummaryResponse;
 import com.example.demo.diagram.ProjectManagementDiagramEntity;
 import com.example.demo.event.UserCreatedEvent;
+import com.example.demo.kafka.ComponentEditedKafkaEvent;
 import com.example.demo.kafka.DiagramSavedKafkaEvent;
 import com.example.demo.kafka.KafkaUserCreatedEvent;
 import java.io.IOException;
@@ -35,12 +36,14 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 public class MonitoringStateService {
 
     private static final int MAX_RECENT_REQUESTS = 120;
+    private static final int MAX_RECENT_COMPONENT_EVENTS = 80;
 
     private final Instant startedAt = Instant.now();
     private final Map<String, AtomicLong> producedByTopic = new ConcurrentHashMap<>();
     private final Map<String, AtomicLong> consumedByTopic = new ConcurrentHashMap<>();
     private final Map<String, Instant> lastKafkaEventAt = new ConcurrentHashMap<>();
     private final Deque<RequestTrace> recentRequests = new LinkedList<>();
+    private final Deque<ComponentEditedKafkaEvent> recentComponentEvents = new LinkedList<>();
     private final RequestMappingHandlerMapping requestMappingHandlerMapping;
     private final String storageRoot;
     private final boolean kafkaEnabled;
@@ -74,6 +77,15 @@ public class MonitoringStateService {
         }
     }
 
+    public void recordComponentEvent(ComponentEditedKafkaEvent componentEditedKafkaEvent) {
+        synchronized (recentComponentEvents) {
+            recentComponentEvents.addFirst(componentEditedKafkaEvent);
+            while (recentComponentEvents.size() > MAX_RECENT_COMPONENT_EVENTS) {
+                recentComponentEvents.removeLast();
+            }
+        }
+    }
+
     public MonitoringSnapshot snapshot() {
         Instant now = Instant.now();
         long uptimeSeconds = Math.max(0, now.getEpochSecond() - startedAt.getEpochSecond());
@@ -86,7 +98,8 @@ public class MonitoringStateService {
             buildEndpoints(),
             buildSchemas(),
             buildDiagramStorageInfo(),
-            snapshotRequests()
+            snapshotRequests(),
+            snapshotComponentEvents()
         );
     }
 
@@ -134,7 +147,8 @@ public class MonitoringStateService {
             ProjectManagementDiagramEntity.class,
             UserCreatedEvent.class,
             KafkaUserCreatedEvent.class,
-            DiagramSavedKafkaEvent.class
+            DiagramSavedKafkaEvent.class,
+            ComponentEditedKafkaEvent.class
         );
         return classes.stream().map(this::toSchemaInfo).toList();
     }
@@ -220,6 +234,12 @@ public class MonitoringStateService {
     private List<RequestTrace> snapshotRequests() {
         synchronized (recentRequests) {
             return List.copyOf(recentRequests);
+        }
+    }
+
+    private List<ComponentEditedKafkaEvent> snapshotComponentEvents() {
+        synchronized (recentComponentEvents) {
+            return List.copyOf(recentComponentEvents);
         }
     }
 }

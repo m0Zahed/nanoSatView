@@ -26,9 +26,6 @@ public class Requirement
     public string[] Tags { get; set; } = Array.Empty<string>();
 
     [Required]
-    public string[] AssignedComponents { get; set; } = Array.Empty<string>();
-
-    [Required]
     public Guid ProjectId { get; set; }
 
     public Project? Project { get; set; }

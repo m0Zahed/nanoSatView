@@ -38,6 +38,16 @@ services:
       - postgres
     restart: unless-stopped
 
+  component-composer-api:
+    build:
+      context: ./nanoSatAPI/componentComposer
+      dockerfile: Dockerfile
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./nanoSatAPI/componentComposer/data:/app/data
+    restart: unless-stopped
+
   client-web:
     build:
       context: ./nanoSatSystems
@@ -45,6 +55,7 @@ services:
       args:
         VITE_AUTH_BASE_URL: /api
         VITE_REQUIREMENTS_BASE_URL: /api/requirements
+        VITE_COMPONENTS_API_BASE_URL: /api/components
     ports:
       - "5173:5173"
     restart: unless-stopped
@@ -83,6 +94,7 @@ services:
     depends_on:
       - auth-service
       - requirements-api
+      - component-composer-api
       - client-web
     ports:
       - "80:80"

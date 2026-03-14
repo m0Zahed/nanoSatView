@@ -28,4 +28,12 @@ public class KafkaConfig {
             .replicas(1)
             .build();
     }
+
+    @Bean
+    public NewTopic componentEditedTopic(@Value("${app.kafka.topic.component-edited}") String topicName) {
+        return TopicBuilder.name(topicName)
+            .partitions(1)
+            .replicas(1)
+            .build();
+    }
 }

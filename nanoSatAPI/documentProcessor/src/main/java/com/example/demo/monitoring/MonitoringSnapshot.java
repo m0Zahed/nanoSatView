@@ -2,6 +2,7 @@ package com.example.demo.monitoring;
 
 import java.time.Instant;
 import java.util.List;
+import com.example.demo.kafka.ComponentEditedKafkaEvent;
 
 public record MonitoringSnapshot(
     Instant generatedAt,
@@ -11,6 +12,7 @@ public record MonitoringSnapshot(
     List<EndpointInfo> endpoints,
     List<SchemaInfo> schemas,
     DiagramStorageInfo diagramStorage,
-    List<RequestTrace> recentRequests
+    List<RequestTrace> recentRequests,
+    List<ComponentEditedKafkaEvent> recentComponentEvents
 ) {
 }

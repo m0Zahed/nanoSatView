@@ -30,6 +30,16 @@ export type DiagramStorageInfo = {
   recentFiles: DiagramFileInfo[];
 };
 
+export type ComponentEditedKafkaEvent = {
+  projectId: string;
+  componentId: string;
+  componentName: string;
+  action: string;
+  editorId: string;
+  editorName: string;
+  eventTime: string;
+};
+
 export type RequestTrace = {
   timestamp: string;
   method: string;
@@ -54,6 +64,7 @@ export type MonitoringSnapshot = {
   schemas: unknown[];
   diagramStorage: DiagramStorageInfo;
   recentRequests: RequestTrace[];
+  recentComponentEvents: ComponentEditedKafkaEvent[];
 };
 
 async function readJson(response: Response): Promise<JsonValue> {

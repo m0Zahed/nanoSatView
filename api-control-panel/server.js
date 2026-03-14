@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const cors = require('cors');
 const { spawn } = require('child_process');
 const net = require('net');
@@ -135,6 +136,8 @@ const componentComposerVenvDir = path.join(componentComposerDir, '.venv');
 const componentComposerVenvPython = process.platform === 'win32'
   ? path.join(componentComposerVenvDir, 'Scripts', 'python.exe')
   : path.join(componentComposerVenvDir, 'bin', 'python');
+const componentComposerRequirementsPath = path.join(componentComposerDir, 'requirements.txt');
+const componentComposerDepsStampPath = path.join(componentComposerVenvDir, '.deps-stamp');
 const documentProcessorDir = path.join(__dirname, '..', 'nanoSatAPI', 'documentProcessor');
 const userManagementDir = path.join(__dirname, '..', 'nanoSatAPI', 'UserManagement');
 const nanoSatSystemsDir = path.join(__dirname, '..', 'nanoSatSystems');
@@ -390,7 +393,97 @@ const stopWindowsProcessByPort = async (port) => {
   await runCommand('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script]);
 };
 
+const getWindowsListeningPidsByPort = async (port) => {
+  const script = `
+    $pids = Get-NetTCPConnection -State Listen -LocalPort ${port} -ErrorAction SilentlyContinue |
+      Select-Object -ExpandProperty OwningProcess -Unique;
+    if ($pids) { $pids -join ',' }
+  `;
+  try {
+    const output = await new Promise((resolve, reject) => {
+      const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { shell: true });
+      let stdout = '';
+      let stderr = '';
+      child.stdout.on('data', (chunk) => {
+        stdout += String(chunk || '');
+      });
+      child.stderr.on('data', (chunk) => {
+        stderr += String(chunk || '');
+      });
+      child.on('error', reject);
+      child.on('exit', (code) => {
+        if (code === 0) {
+          resolve(stdout.trim());
+          return;
+        }
+        reject(new Error(stderr.trim() || `powershell exited with code ${code}`));
+      });
+    });
+    if (!output) {
+      return [];
+    }
+    return output
+      .split(',')
+      .map((value) => parseInt(value.trim(), 10))
+      .filter((value) => Number.isInteger(value) && value > 0);
+  } catch (_) {
+    return [];
+  }
+};
+
+const getWindowsProjectManagementPids = async () => {
+  const script = `
+    $p1 = Get-CimInstance Win32_Process -Filter "Name='ProjectManagement.exe'" | Select-Object -ExpandProperty ProcessId;
+    $p2 = Get-CimInstance Win32_Process -Filter "Name='dotnet.exe'" |
+      Where-Object { $_.CommandLine -like '*ProjectManagement*' } |
+      Select-Object -ExpandProperty ProcessId;
+    $all = @($p1) + @($p2) | Sort-Object -Unique;
+    if ($all) { $all -join ',' }
+  `;
+  try {
+    const output = await new Promise((resolve, reject) => {
+      const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { shell: true });
+      let stdout = '';
+      let stderr = '';
+      child.stdout.on('data', (chunk) => {
+        stdout += String(chunk || '');
+      });
+      child.stderr.on('data', (chunk) => {
+        stderr += String(chunk || '');
+      });
+      child.on('error', reject);
+      child.on('exit', (code) => {
+        if (code === 0) {
+          resolve(stdout.trim());
+          return;
+        }
+        reject(new Error(stderr.trim() || `powershell exited with code ${code}`));
+      });
+    });
+    if (!output) {
+      return [];
+    }
+    return output
+      .split(',')
+      .map((value) => parseInt(value.trim(), 10))
+      .filter((value) => Number.isInteger(value) && value > 0);
+  } catch (_) {
+    return [];
+  }
+};
+
+const stopWindowsPids = async (pids = []) => {
+  for (const pid of pids) {
+    await runCommand('taskkill', ['/PID', String(pid), '/T', '/F'], { shell: true }).catch(() => {});
+  }
+};
+
 let composerDepsInstalled = false;
+
+const fileHash = (filePath) => {
+  const content = fs.readFileSync(filePath);
+  return crypto.createHash('sha256').update(content).digest('hex');
+};
 
 const ensureComponentComposerDependencies = async () => {
   if (!fs.existsSync(componentComposerVenvPython)) {
@@ -403,12 +496,22 @@ const ensureComponentComposerDependencies = async () => {
   if (composerDepsInstalled) {
     return;
   }
+  const requirementsHash = fileHash(componentComposerRequirementsPath);
+  const existingStamp = fs.existsSync(componentComposerDepsStampPath)
+    ? fs.readFileSync(componentComposerDepsStampPath, 'utf8').trim()
+    : '';
+  if (existingStamp === requirementsHash) {
+    composerDepsInstalled = true;
+    appendServiceLog('component-composer', 'stdout', 'Dependencies already up to date (requirements hash match).');
+    return;
+  }
   await runCommandWithLogs('component-composer', componentComposerVenvPython, ['-m', 'pip', 'install', '--upgrade', 'pip'], {
     cwd: componentComposerDir,
   });
   await runCommandWithLogs('component-composer', componentComposerVenvPython, ['-m', 'pip', 'install', '-r', 'requirements.txt'], {
     cwd: componentComposerDir,
   });
+  fs.writeFileSync(componentComposerDepsStampPath, requirementsHash, 'utf8');
   composerDepsInstalled = true;
 };
 
@@ -450,6 +553,25 @@ const startServiceProcess = async (serviceId) => {
   }
   if (state.stopPending) {
     throw new Error(`stop already in progress for ${definition.name}`);
+  }
+  if (definition.port) {
+    const portInUse = await isPortListening(definition.port);
+    if (portInUse) {
+      const pids = process.platform === 'win32' ? await getWindowsListeningPidsByPort(definition.port) : [];
+      const pidNote = pids.length ? ` (PID: ${pids.join(', ')})` : '';
+      const message = `${definition.name} cannot start: port ${definition.port} is already in use${pidNote}.`;
+      appendServiceLog(serviceId, 'stderr', message);
+      broadcastServiceUpdate();
+      throw new Error(message);
+    }
+  }
+  if (process.platform === 'win32' && definition.id === 'requirements-api') {
+    const stalePids = await getWindowsProjectManagementPids();
+    if (stalePids.length) {
+      appendServiceLog(serviceId, 'stdout', `Stopping stale ProjectManagement process(es): ${stalePids.join(', ')}`);
+      await stopWindowsPids(stalePids);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
   }
   state.startPending = true;
   appendServiceLog(serviceId, 'stdout', `Starting ${definition.name}...`);
@@ -524,6 +646,38 @@ const stopServiceProcess = async (serviceId) => {
   }
   if (state.stopPending) {
     throw new Error(`stop already in progress for ${definition.name}`);
+  }
+  if (!state.process && definition.port) {
+    const occupied = await isPortListening(definition.port);
+    if (occupied && process.platform === 'win32') {
+      state.stopPending = true;
+      appendServiceLog(serviceId, 'stdout', `Stopping ${definition.name} by port ${definition.port}...`);
+      broadcastServiceUpdate();
+      try {
+        await stopWindowsProcessByPort(definition.port);
+        appendServiceLog(serviceId, 'stdout', `${definition.name} stopped by port cleanup.`);
+      } finally {
+        state.stopPending = false;
+        broadcastServiceUpdate();
+      }
+      return serviceSnapshot(serviceId);
+    }
+  }
+  if (!state.process && process.platform === 'win32' && definition.id === 'requirements-api') {
+    const stalePids = await getWindowsProjectManagementPids();
+    if (stalePids.length) {
+      state.stopPending = true;
+      appendServiceLog(serviceId, 'stdout', `Stopping ProjectManagement process(es): ${stalePids.join(', ')}`);
+      broadcastServiceUpdate();
+      try {
+        await stopWindowsPids(stalePids);
+        appendServiceLog(serviceId, 'stdout', `${definition.name} stopped by process cleanup.`);
+      } finally {
+        state.stopPending = false;
+        broadcastServiceUpdate();
+      }
+      return serviceSnapshot(serviceId);
+    }
   }
   if (!state.process) {
     throw new Error(`${definition.name} is not running`);

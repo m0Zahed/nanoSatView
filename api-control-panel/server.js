@@ -34,6 +34,11 @@ const kafkaStartScript = path.join(
   process.platform === 'win32' ? 'windows/kafka-server-start.bat' : 'kafka-server-start.sh'
 );
 const kafkaStartScriptAvailable = fs.existsSync(kafkaStartScript);
+const kafkaWindowsLibsDir = path.join(kafkaDist, 'libs');
+const kafkaWindowsLog4jConfig = path.join(kafkaDist, 'config', 'tools-log4j.properties');
+const kafkaWindowsDirectLaunchAvailable =
+  process.platform === 'win32' && fs.existsSync(kafkaWindowsLibsDir) && fs.existsSync(kafkaWindowsLog4jConfig);
+const kafkaLaunchAvailable = process.platform === 'win32' ? kafkaWindowsDirectLaunchAvailable || kafkaStartScriptAvailable : kafkaStartScriptAvailable;
 
 let kafkaConnected = false;
 let connectPromise = null;
@@ -67,7 +72,7 @@ const kafkaProcessSnapshot = () => ({
   running: Boolean(kafkaProcess),
   pid: kafkaProcess?.pid ?? null,
   startTime: kafkaProcessStartTime ? kafkaProcessStartTime.toISOString() : null,
-  scriptAvailable: kafkaStartScriptAvailable,
+  scriptAvailable: kafkaLaunchAvailable,
   logs: [...kafkaProcessLogs],
 });
 
@@ -731,18 +736,44 @@ const scheduleReconnect = () => {
 };
 
 const startKafkaProcess = () => {
-  if (!kafkaStartScriptAvailable) {
+  if (!kafkaLaunchAvailable) {
     throw new Error('Kafka start script is missing from the repository.');
   }
   if (kafkaProcess) {
     throw new Error('Kafka process is already running.');
   }
 
-  const child = spawn(kafkaStartScript, [kafkaConfigPath], {
-    cwd: path.dirname(kafkaStartScript),
-    shell: true,
-    env: process.env,
-  });
+  let child;
+  if (process.platform === 'win32' && kafkaWindowsDirectLaunchAvailable) {
+    // Avoid Windows CMD 8191-character command expansion limits in kafka-run-class.bat.
+    const kafkaLogsDir = path.join(kafkaDist, 'logs');
+    const kafkaLog4jFileUri = `file:${kafkaWindowsLog4jConfig.replace(/\\/g, '/')}`;
+    const javaCommand = process.env.JAVA_HOME ? path.join(process.env.JAVA_HOME, 'bin', 'java.exe') : 'java';
+    child = spawn(
+      javaCommand,
+      [
+        '-Xmx1G',
+        '-Xms1G',
+        `-Dkafka.logs.dir=${kafkaLogsDir}`,
+        `-Dlog4j.configuration=${kafkaLog4jFileUri}`,
+        '-cp',
+        path.join(kafkaWindowsLibsDir, '*'),
+        'kafka.Kafka',
+        kafkaConfigPath,
+      ],
+      {
+        cwd: kafkaDist,
+        shell: false,
+        env: { ...process.env, LOG_DIR: kafkaLogsDir },
+      }
+    );
+  } else {
+    child = spawn(kafkaStartScript, [kafkaConfigPath], {
+      cwd: path.dirname(kafkaStartScript),
+      shell: true,
+      env: process.env,
+    });
+  }
   kafkaProcess = child;
   kafkaProcessStartTime = new Date();
   kafkaProcessLogs.length = 0;
@@ -759,11 +790,13 @@ const startKafkaProcess = () => {
     console.error('Kafka process error', error);
     appendKafkaProcessLog('stderr', `Kafka process error: ${error.message}`);
     kafkaProcess = null;
+    kafkaProcessStartTime = null;
     sendKafkaProcessUpdate();
   });
   child.on('exit', (code, signal) => {
     appendKafkaProcessLog('stderr', `Kafka process exited with code=${code} signal=${signal}`);
     kafkaProcess = null;
+    kafkaProcessStartTime = null;
     sendKafkaProcessUpdate();
   });
 

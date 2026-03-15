@@ -1,38 +1,16 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ComponentsView } from './ComponentsView';
 
-const baseProps = {
-  projectName: 'Mission Alpha',
-  components: [
-    JSON.stringify({
-      id: 'cmp-1',
-      name: 'Sensor Pod',
-      type: 'Avionics',
-      quantity: 1,
-      notes: 'primary',
-    }),
-  ],
-  requirements: [
-    {
-      id: 'req-db-1',
-      reqId: 'REQ-1',
-      description: 'Maintain thermal survivability.',
-      subsystem: 'Thermal',
-      tags: ['thermal'],
-      assignedComponents: ['Sensor Pod'],
-      projectId: 'project-1',
-    },
-  ],
-  onAddComponent: vi.fn(),
-  onRemoveComponent: vi.fn(),
-};
-
 describe('ComponentsView document builder flow', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
 
   it('fetches docs, uploads a doc, and drops document and requirement cards into the builder stack', async () => {
+    const onAddComponent = vi.fn(async () => true);
+    const onUpdateComponent = vi.fn(async () => true);
+    const onRemoveComponent = vi.fn(async () => true);
+
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method || 'GET';
@@ -76,7 +54,51 @@ describe('ComponentsView document builder flow', () => {
 
     vi.stubGlobal('fetch', fetchMock);
 
-    render(<ComponentsView {...baseProps} />);
+    render(
+      <ComponentsView
+        projectName="Mission Alpha"
+        components={[
+          {
+            id: 'cmp-1',
+            name: 'Sensor Pod',
+            type: 'Avionics',
+            quantity: 1,
+            notes: 'primary',
+            projectId: 'project-1',
+            requirementIds: [],
+            builderStack: [
+              {
+                id: 'seed-text-1',
+                type: 'text',
+                title: 'Mission Context',
+                content: 'Summarize mission context and scope before detailed component references.',
+              },
+            ],
+            markdownDraft: '',
+            lastEditedBy: 'user-1',
+            lastEditedByName: 'User One',
+            lastEditedAt: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ]}
+        requirements={[
+          {
+            id: 'req-db-1',
+            reqId: 'REQ-1',
+            description: 'Maintain thermal survivability.',
+            subsystem: 'Thermal',
+            tags: ['thermal'],
+            assignedComponents: ['Sensor Pod'],
+            projectId: 'project-1',
+          },
+        ]}
+        componentEvents={[]}
+        onAddComponent={onAddComponent}
+        onUpdateComponent={onUpdateComponent}
+        onRemoveComponent={onRemoveComponent}
+      />
+    );
 
     fireEvent.click(screen.getByLabelText('Expand tools searching section'));
 
@@ -129,7 +151,11 @@ describe('ComponentsView document builder flow', () => {
     fireEvent.drop(dropZone, { dataTransfer: requirementTransfer });
 
     await waitFor(() => {
-      expect(screen.getAllByText('REQ-1').length).toBeGreaterThan(1);
+      expect(screen.getByTestId('builder-blob-2')).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(onUpdateComponent).toHaveBeenCalled();
     });
   });
 });

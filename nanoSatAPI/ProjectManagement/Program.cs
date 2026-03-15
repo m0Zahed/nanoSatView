@@ -1,4 +1,5 @@
 using System.Data;
+using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
@@ -44,6 +45,7 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddOpenApi();
+builder.Services.AddHttpClient();
 
 var app = builder.Build();
 
@@ -76,7 +78,15 @@ app.MapGet("/requirements", async (Guid? projectId, RequirementsDbContext db) =>
         query = query.Where(r => r.ProjectId == projectId.Value);
     }
 
-    return Results.Ok(await query.OrderBy(r => r.ReqId).ToListAsync());
+    var requirements = await query.OrderBy(r => r.ReqId).ToListAsync();
+    var componentsQuery = db.ProjectComponents.AsNoTracking();
+    if (projectId.HasValue)
+    {
+        componentsQuery = componentsQuery.Where(component => component.ProjectId == projectId.Value);
+    }
+
+    var componentAssignments = BuildRequirementAssignmentMap(await componentsQuery.ToListAsync());
+    return Results.Ok(requirements.Select(requirement => ToRequirementResponseDto(requirement, componentAssignments)));
 });
 
 // Frontend requirements panel + component builder: fetch the requirements attached to one project.
@@ -96,14 +106,33 @@ app.MapGet("/projects/{projectId:guid}/requirements", async (Guid projectId, Req
         .OrderBy(r => r.ReqId)
         .ToListAsync();
 
-    return Results.Ok(requirements);
+    var componentAssignments = BuildRequirementAssignmentMap(
+        await db.ProjectComponents
+            .AsNoTracking()
+            .Where(component => component.ProjectId == projectId)
+            .ToListAsync()
+    );
+
+    return Results.Ok(requirements.Select(requirement => ToRequirementResponseDto(requirement, componentAssignments)));
 });
 
 // Frontend requirement detail/edit screen: fetch one requirement by id.
 app.MapGet("/requirements/{id:guid}", async (Guid id, RequirementsDbContext db) =>
 {
     var requirement = await db.Requirements.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id);
-    return requirement is null ? Results.NotFound() : Results.Ok(requirement);
+    if (requirement is null)
+    {
+        return Results.NotFound();
+    }
+
+    var componentAssignments = BuildRequirementAssignmentMap(
+        await db.ProjectComponents
+            .AsNoTracking()
+            .Where(component => component.ProjectId == requirement.ProjectId)
+            .ToListAsync()
+    );
+
+    return Results.Ok(ToRequirementResponseDto(requirement, componentAssignments));
 });
 
 // Frontend requirement create flow: create a new requirement under a project.
@@ -129,13 +158,15 @@ app.MapPost("/requirements", async (RequirementCreateDto input, RequirementsDbCo
         Subsystem = input.Subsystem.Trim(),
         ProjectId = input.ProjectId,
         Tags = NormalizeTags(input.Tags),
-        AssignedComponents = NormalizeStringArray(input.AssignedComponents),
     };
 
     db.Requirements.Add(requirement);
     await db.SaveChangesAsync();
 
-    return Results.Created($"/requirements/{requirement.Id}", requirement);
+    return Results.Created(
+        $"/requirements/{requirement.Id}",
+        ToRequirementResponseDto(requirement, new Dictionary<Guid, string[]>())
+    );
 });
 
 // Frontend requirement edit flow: update an existing requirement row.
@@ -165,11 +196,17 @@ app.MapPut("/requirements/{id:guid}", async (Guid id, RequirementUpdateDto input
     requirement.Subsystem = input.Subsystem.Trim();
     requirement.ProjectId = input.ProjectId;
     requirement.Tags = NormalizeTags(input.Tags);
-    requirement.AssignedComponents = NormalizeStringArray(input.AssignedComponents);
 
     await db.SaveChangesAsync();
 
-    return Results.Ok(requirement);
+    var componentAssignments = BuildRequirementAssignmentMap(
+        await db.ProjectComponents
+            .AsNoTracking()
+            .Where(component => component.ProjectId == requirement.ProjectId)
+            .ToListAsync()
+    );
+
+    return Results.Ok(ToRequirementResponseDto(requirement, componentAssignments));
 });
 
 // Frontend requirement delete action: remove requirement from the selected project.
@@ -181,11 +218,243 @@ app.MapDelete("/requirements/{id:guid}", async (Guid id, RequirementsDbContext d
         return Results.NotFound();
     }
 
+    var linkedComponents = await db.ProjectComponents
+        .Where(component => component.ProjectId == requirement.ProjectId && component.RequirementIds.Contains(id))
+        .ToListAsync();
+
+    foreach (var component in linkedComponents)
+    {
+        component.RequirementIds = component.RequirementIds
+            .Where(requirementId => requirementId != id)
+            .Distinct()
+            .ToArray();
+        component.UpdatedAt = DateTime.UtcNow;
+    }
+
     db.Requirements.Remove(requirement);
     await db.SaveChangesAsync();
 
     return Results.NoContent();
 });
+
+// =======================================   COMPONENTS  =============================================
+
+app.MapGet("/projects/{projectId:guid}/components", async (Guid projectId, RequirementsDbContext db) =>
+{
+    var projectExists = await db.Projects
+        .AsNoTracking()
+        .AnyAsync(project => project.Id == projectId);
+    if (!projectExists)
+    {
+        return Results.NotFound(new { error = "Project not found." });
+    }
+
+    var components = await db.ProjectComponents
+        .AsNoTracking()
+        .Where(component => component.ProjectId == projectId)
+        .OrderByDescending(component => component.UpdatedAt)
+        .ToListAsync();
+
+    return Results.Ok(components.Select(ToProjectComponentResponseDto));
+});
+
+app.MapGet("/projects/{projectId:guid}/component-events", async (Guid projectId, int? take, RequirementsDbContext db) =>
+{
+    var projectExists = await db.Projects
+        .AsNoTracking()
+        .AnyAsync(project => project.Id == projectId);
+    if (!projectExists)
+    {
+        return Results.NotFound(new { error = "Project not found." });
+    }
+
+    var limit = Math.Clamp(take ?? 25, 1, 100);
+    var events = await db.ComponentAuditEvents
+        .AsNoTracking()
+        .Where(componentEvent => componentEvent.ProjectId == projectId)
+        .OrderByDescending(componentEvent => componentEvent.EventTime)
+        .Take(limit)
+        .ToListAsync();
+
+    return Results.Ok(events.Select(ToComponentAuditEventResponseDto));
+});
+
+app.MapPost(
+    "/components",
+    async (
+        ProjectComponentCreateDto input,
+        RequirementsDbContext db,
+        IHttpClientFactory httpClientFactory,
+        IConfiguration config,
+        ILoggerFactory loggerFactory
+    ) =>
+    {
+        var normalized = NormalizeProjectComponentCreate(input);
+        if (!IsValidProjectComponentCreate(normalized))
+        {
+            return Results.BadRequest(new { error = "Invalid component payload." });
+        }
+
+        var projectExists = await db.Projects
+            .AsNoTracking()
+            .AnyAsync(project => project.Id == normalized.ProjectId);
+        if (!projectExists)
+        {
+            return Results.BadRequest(new { error = "ProjectId does not exist." });
+        }
+
+        var hasValidRequirements = await ValidateProjectComponentRequirementIdsAsync(
+            db,
+            normalized.ProjectId,
+            normalized.RequirementIds
+        );
+        if (!hasValidRequirements)
+        {
+            return Results.BadRequest(new { error = "RequirementIds must belong to the same project." });
+        }
+
+        var now = DateTime.UtcNow;
+        var component = new ProjectComponent
+        {
+            Name = normalized.Name,
+            Type = normalized.Type,
+            Quantity = normalized.Quantity,
+            Notes = normalized.Notes,
+            ProjectId = normalized.ProjectId,
+            RequirementIds = normalized.RequirementIds,
+            BuilderStackJson = SerializeBuilderStack(normalized.BuilderStack),
+            MarkdownDraft = normalized.MarkdownDraft,
+            LastEditedBy = normalized.EditorId,
+            LastEditedByName = normalized.EditorName,
+            LastEditedAt = now,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+
+        var auditEvent = CreateComponentAuditEvent(component, "created", normalized.EditorId, normalized.EditorName, now);
+
+        db.ProjectComponents.Add(component);
+        db.ComponentAuditEvents.Add(auditEvent);
+        await db.SaveChangesAsync();
+
+        await PublishComponentAuditEventAsync(
+            httpClientFactory,
+            config,
+            auditEvent,
+            loggerFactory.CreateLogger("ComponentAudit")
+        );
+
+        return Results.Created($"/components/{component.Id}", ToProjectComponentResponseDto(component));
+    }
+);
+
+app.MapPut(
+    "/components/{id:guid}",
+    async (
+        Guid id,
+        ProjectComponentUpdateDto input,
+        RequirementsDbContext db,
+        IHttpClientFactory httpClientFactory,
+        IConfiguration config,
+        ILoggerFactory loggerFactory
+    ) =>
+    {
+        var normalized = NormalizeProjectComponentUpdate(input);
+        if (!IsValidProjectComponentUpdate(normalized))
+        {
+            return Results.BadRequest(new { error = "Invalid component payload." });
+        }
+
+        var projectExists = await db.Projects
+            .AsNoTracking()
+            .AnyAsync(project => project.Id == normalized.ProjectId);
+        if (!projectExists)
+        {
+            return Results.BadRequest(new { error = "ProjectId does not exist." });
+        }
+
+        var hasValidRequirements = await ValidateProjectComponentRequirementIdsAsync(
+            db,
+            normalized.ProjectId,
+            normalized.RequirementIds
+        );
+        if (!hasValidRequirements)
+        {
+            return Results.BadRequest(new { error = "RequirementIds must belong to the same project." });
+        }
+
+        var component = await db.ProjectComponents.FirstOrDefaultAsync(projectComponent => projectComponent.Id == id);
+        if (component is null)
+        {
+            return Results.NotFound();
+        }
+
+        var now = DateTime.UtcNow;
+        component.Name = normalized.Name;
+        component.Type = normalized.Type;
+        component.Quantity = normalized.Quantity;
+        component.Notes = normalized.Notes;
+        component.ProjectId = normalized.ProjectId;
+        component.RequirementIds = normalized.RequirementIds;
+        component.BuilderStackJson = SerializeBuilderStack(normalized.BuilderStack);
+        component.MarkdownDraft = normalized.MarkdownDraft;
+        component.LastEditedBy = normalized.EditorId;
+        component.LastEditedByName = normalized.EditorName;
+        component.LastEditedAt = now;
+        component.UpdatedAt = now;
+
+        var auditEvent = CreateComponentAuditEvent(component, "updated", normalized.EditorId, normalized.EditorName, now);
+        db.ComponentAuditEvents.Add(auditEvent);
+        await db.SaveChangesAsync();
+
+        await PublishComponentAuditEventAsync(
+            httpClientFactory,
+            config,
+            auditEvent,
+            loggerFactory.CreateLogger("ComponentAudit")
+        );
+
+        return Results.Ok(ToProjectComponentResponseDto(component));
+    }
+);
+
+app.MapDelete(
+    "/components/{id:guid}",
+    async (
+        Guid id,
+        string? editorId,
+        string? editorName,
+        RequirementsDbContext db,
+        IHttpClientFactory httpClientFactory,
+        IConfiguration config,
+        ILoggerFactory loggerFactory
+    ) =>
+    {
+        var component = await db.ProjectComponents.FirstOrDefaultAsync(projectComponent => projectComponent.Id == id);
+        if (component is null)
+        {
+            return Results.NotFound();
+        }
+
+        var now = DateTime.UtcNow;
+        var normalizedEditorId = string.IsNullOrWhiteSpace(editorId) ? component.LastEditedBy : editorId.Trim();
+        var normalizedEditorName = string.IsNullOrWhiteSpace(editorName) ? component.LastEditedByName : editorName.Trim();
+
+        var auditEvent = CreateComponentAuditEvent(component, "deleted", normalizedEditorId, normalizedEditorName, now);
+        db.ComponentAuditEvents.Add(auditEvent);
+        db.ProjectComponents.Remove(component);
+        await db.SaveChangesAsync();
+
+        await PublishComponentAuditEventAsync(
+            httpClientFactory,
+            config,
+            auditEvent,
+            loggerFactory.CreateLogger("ComponentAudit")
+        );
+
+        return Results.NoContent();
+    }
+);
 
 // =========================== Projects ==========================
 
@@ -290,6 +559,13 @@ app.MapDelete("/projects/{id:guid}", async (Guid id, RequirementsDbContext db) =
     var members = project.MemberIds.ToArray();
     var organizationId = project.OrganizationId;
 
+    var requirements = await db.Requirements.Where(requirement => requirement.ProjectId == id).ToListAsync();
+    var components = await db.ProjectComponents.Where(component => component.ProjectId == id).ToListAsync();
+    var componentEvents = await db.ComponentAuditEvents.Where(componentEvent => componentEvent.ProjectId == id).ToListAsync();
+
+    db.Requirements.RemoveRange(requirements);
+    db.ProjectComponents.RemoveRange(components);
+    db.ComponentAuditEvents.RemoveRange(componentEvents);
     db.Projects.Remove(project);
     await RemoveProjectFromIndexesAsync(db, project.Id, members);
     await RemoveProjectFromOrganizationIndexAsync(db, organizationId, project.Id);
@@ -622,6 +898,295 @@ await ApplySeedDataIfDatabaseEmptyAsync(app);
 app.Run();
 
 // ==================  Functions to verify if the API payload is correct for that API call ============================
+
+static RequirementResponseDto ToRequirementResponseDto(
+    Requirement requirement,
+    IReadOnlyDictionary<Guid, string[]> componentAssignments
+)
+{
+    componentAssignments.TryGetValue(requirement.Id, out var assignedComponents);
+    return new RequirementResponseDto(
+        requirement.Id,
+        requirement.ReqId,
+        requirement.Description,
+        requirement.Subsystem,
+        requirement.Tags,
+        assignedComponents ?? Array.Empty<string>(),
+        requirement.ProjectId
+    );
+}
+
+static Dictionary<Guid, string[]> BuildRequirementAssignmentMap(IEnumerable<ProjectComponent> components)
+{
+    var map = new Dictionary<Guid, HashSet<string>>();
+
+    foreach (var component in components)
+    {
+        var componentName = component.Name?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(componentName))
+        {
+            continue;
+        }
+
+        foreach (var requirementId in component.RequirementIds.Distinct())
+        {
+            if (!map.TryGetValue(requirementId, out var names))
+            {
+                names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                map[requirementId] = names;
+            }
+
+            names.Add(componentName);
+        }
+    }
+
+    return map.ToDictionary(
+        pair => pair.Key,
+        pair => pair.Value.OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray()
+    );
+}
+
+static ProjectComponentResponseDto ToProjectComponentResponseDto(ProjectComponent component)
+{
+    return new ProjectComponentResponseDto(
+        component.Id,
+        component.Name,
+        component.Type,
+        component.Quantity,
+        component.Notes,
+        component.ProjectId,
+        component.RequirementIds,
+        DeserializeBuilderStack(component.BuilderStackJson),
+        component.MarkdownDraft,
+        component.LastEditedBy,
+        component.LastEditedByName,
+        component.LastEditedAt,
+        component.CreatedAt,
+        component.UpdatedAt
+    );
+}
+
+static ComponentAuditEventResponseDto ToComponentAuditEventResponseDto(ComponentAuditEvent componentAuditEvent)
+{
+    return new ComponentAuditEventResponseDto(
+        componentAuditEvent.Id,
+        componentAuditEvent.ProjectId,
+        componentAuditEvent.ComponentId,
+        componentAuditEvent.ComponentName,
+        componentAuditEvent.Action,
+        componentAuditEvent.EditorId,
+        componentAuditEvent.EditorName,
+        componentAuditEvent.EventTime
+    );
+}
+
+static List<ComponentBuilderBlobDto> DeserializeBuilderStack(string? builderStackJson)
+{
+    if (string.IsNullOrWhiteSpace(builderStackJson))
+    {
+        return new List<ComponentBuilderBlobDto>();
+    }
+
+    try
+    {
+        return JsonSerializer.Deserialize<List<ComponentBuilderBlobDto>>(builderStackJson) ?? new List<ComponentBuilderBlobDto>();
+    }
+    catch
+    {
+        return new List<ComponentBuilderBlobDto>();
+    }
+}
+
+static string SerializeBuilderStack(List<ComponentBuilderBlobDto>? builderStack)
+{
+    return JsonSerializer.Serialize(NormalizeBuilderStack(builderStack));
+}
+
+static ProjectComponentCreateDto NormalizeProjectComponentCreate(ProjectComponentCreateDto input)
+{
+    return input with
+    {
+        Name = (input.Name ?? string.Empty).Trim(),
+        Type = (input.Type ?? string.Empty).Trim(),
+        Notes = (input.Notes ?? string.Empty).Trim(),
+        RequirementIds = NormalizeGuidArray(input.RequirementIds),
+        BuilderStack = NormalizeBuilderStack(input.BuilderStack),
+        MarkdownDraft = input.MarkdownDraft ?? string.Empty,
+        EditorId = (input.EditorId ?? string.Empty).Trim(),
+        EditorName = (input.EditorName ?? string.Empty).Trim(),
+    };
+}
+
+static ProjectComponentUpdateDto NormalizeProjectComponentUpdate(ProjectComponentUpdateDto input)
+{
+    return input with
+    {
+        Name = (input.Name ?? string.Empty).Trim(),
+        Type = (input.Type ?? string.Empty).Trim(),
+        Notes = (input.Notes ?? string.Empty).Trim(),
+        RequirementIds = NormalizeGuidArray(input.RequirementIds),
+        BuilderStack = NormalizeBuilderStack(input.BuilderStack),
+        MarkdownDraft = input.MarkdownDraft ?? string.Empty,
+        EditorId = (input.EditorId ?? string.Empty).Trim(),
+        EditorName = (input.EditorName ?? string.Empty).Trim(),
+    };
+}
+
+static List<ComponentBuilderBlobDto> NormalizeBuilderStack(List<ComponentBuilderBlobDto>? builderStack)
+{
+    return (builderStack ?? new List<ComponentBuilderBlobDto>())
+        .Select(blob => new ComponentBuilderBlobDto(
+            (blob.Id ?? string.Empty).Trim(),
+            (blob.Type ?? string.Empty).Trim(),
+            (blob.Title ?? string.Empty).Trim(),
+            blob.Content ?? string.Empty,
+            string.IsNullOrWhiteSpace(blob.SourceId) ? null : blob.SourceId.Trim()
+        ))
+        .ToList();
+}
+
+static Guid[] NormalizeGuidArray(Guid[]? items)
+{
+    return (items ?? Array.Empty<Guid>())
+        .Where(item => item != Guid.Empty)
+        .Distinct()
+        .ToArray();
+}
+
+static bool IsValidProjectComponentCreate(ProjectComponentCreateDto input)
+{
+    return IsValidProjectComponentFields(
+        input.Name,
+        input.Type,
+        input.Quantity,
+        input.ProjectId,
+        input.EditorId,
+        input.EditorName
+    );
+}
+
+static bool IsValidProjectComponentUpdate(ProjectComponentUpdateDto input)
+{
+    return IsValidProjectComponentFields(
+        input.Name,
+        input.Type,
+        input.Quantity,
+        input.ProjectId,
+        input.EditorId,
+        input.EditorName
+    );
+}
+
+static bool IsValidProjectComponentFields(
+    string name,
+    string type,
+    int quantity,
+    Guid projectId,
+    string editorId,
+    string editorName
+)
+{
+    return !string.IsNullOrWhiteSpace(name)
+        && name.Length <= 200
+        && !string.IsNullOrWhiteSpace(type)
+        && type.Length <= 200
+        && quantity > 0
+        && projectId != Guid.Empty
+        && !string.IsNullOrWhiteSpace(editorId)
+        && editorId.Length <= 200
+        && !string.IsNullOrWhiteSpace(editorName)
+        && editorName.Length <= 200;
+}
+
+static async Task<bool> ValidateProjectComponentRequirementIdsAsync(
+    RequirementsDbContext db,
+    Guid projectId,
+    Guid[] requirementIds
+)
+{
+    if (requirementIds.Length == 0)
+    {
+        return true;
+    }
+
+    var expectedCount = requirementIds.Distinct().Count();
+    var actualCount = await db.Requirements
+        .AsNoTracking()
+        .Where(requirement => requirement.ProjectId == projectId && requirementIds.Contains(requirement.Id))
+        .Select(requirement => requirement.Id)
+        .Distinct()
+        .CountAsync();
+
+    return actualCount == expectedCount;
+}
+
+static ComponentAuditEvent CreateComponentAuditEvent(
+    ProjectComponent component,
+    string action,
+    string editorId,
+    string editorName,
+    DateTime eventTime
+)
+{
+    return new ComponentAuditEvent
+    {
+        ProjectId = component.ProjectId,
+        ComponentId = component.Id,
+        ComponentName = component.Name,
+        Action = action,
+        EditorId = editorId,
+        EditorName = editorName,
+        EventTime = eventTime,
+    };
+}
+
+static async Task PublishComponentAuditEventAsync(
+    IHttpClientFactory httpClientFactory,
+    IConfiguration config,
+    ComponentAuditEvent componentAuditEvent,
+    ILogger logger
+)
+{
+    var baseUrl = (config["DOCUMENT_PROCESSOR_BASE_URL"] ?? "http://localhost:8080").Trim().TrimEnd('/');
+    if (string.IsNullOrWhiteSpace(baseUrl))
+    {
+        return;
+    }
+
+    try
+    {
+        var client = httpClientFactory.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            $"{baseUrl}/api/monitoring/component-events",
+            new ForwardedComponentAuditEvent(
+                componentAuditEvent.ProjectId,
+                componentAuditEvent.ComponentId,
+                componentAuditEvent.ComponentName,
+                componentAuditEvent.Action,
+                componentAuditEvent.EditorId,
+                componentAuditEvent.EditorName,
+                componentAuditEvent.EventTime
+            )
+        );
+
+        if (!response.IsSuccessStatusCode)
+        {
+            logger.LogWarning(
+                "Document processor rejected component audit event for component {ComponentId} with status {StatusCode}.",
+                componentAuditEvent.ComponentId,
+                response.StatusCode
+            );
+        }
+    }
+    catch (Exception ex)
+    {
+        logger.LogWarning(
+            ex,
+            "Failed to forward component audit event for component {ComponentId} to the document processor.",
+            componentAuditEvent.ComponentId
+        );
+    }
+}
 
 static bool IsValidRequirementCreate(RequirementCreateDto input)
 {
@@ -1051,6 +1616,8 @@ static async Task<SeedDataFile> BuildSeedDataFileAsync(RequirementsDbContext db)
     var organisations = await db.Organisations.AsNoTracking().ToListAsync();
     var projects = await db.Projects.AsNoTracking().ToListAsync();
     var requirements = await db.Requirements.AsNoTracking().ToListAsync();
+    var projectComponents = await db.ProjectComponents.AsNoTracking().ToListAsync();
+    var componentAuditEvents = await db.ComponentAuditEvents.AsNoTracking().ToListAsync();
     var invites = await db.OrganisationInvites.AsNoTracking().ToListAsync();
     var memberIndexes = await db.MemberProjectIndexes.AsNoTracking().ToListAsync();
     var organizationIndexes = await db.OrganizationProjectIndexes.AsNoTracking().ToListAsync();
@@ -1059,6 +1626,8 @@ static async Task<SeedDataFile> BuildSeedDataFileAsync(RequirementsDbContext db)
         organisations,
         projects,
         requirements,
+        projectComponents,
+        componentAuditEvents,
         invites,
         memberIndexes,
         organizationIndexes
@@ -1357,7 +1926,9 @@ static async Task ApplySeedDataIfDatabaseEmptyAsync(WebApplication app)
 
     var hasData = await db.Organisations.AsNoTracking().AnyAsync()
         || await db.Projects.AsNoTracking().AnyAsync()
-        || await db.Requirements.AsNoTracking().AnyAsync();
+        || await db.Requirements.AsNoTracking().AnyAsync()
+        || await db.ProjectComponents.AsNoTracking().AnyAsync()
+        || await db.ComponentAuditEvents.AsNoTracking().AnyAsync();
     if (hasData)
     {
         logger.LogInformation("Skipping seed load because database already contains data.");
@@ -1396,6 +1967,8 @@ static async Task ApplySeedDataIfDatabaseEmptyAsync(WebApplication app)
     var organisations = seed.Organisations ?? new List<Organisation>();
     var projects = seed.Projects ?? new List<Project>();
     var requirements = seed.Requirements ?? new List<Requirement>();
+    var projectComponents = seed.ProjectComponents ?? new List<ProjectComponent>();
+    var componentAuditEvents = seed.ComponentAuditEvents ?? new List<ComponentAuditEvent>();
     var invites = seed.OrganisationInvites ?? new List<OrganisationInvite>();
     var memberIndexes = seed.MemberProjectIndexes ?? new List<MemberProjectIndex>();
     var organizationIndexes = seed.OrganizationProjectIndexes ?? new List<OrganizationProjectIndex>();
@@ -1403,6 +1976,8 @@ static async Task ApplySeedDataIfDatabaseEmptyAsync(WebApplication app)
     if (organisations.Count == 0
         && projects.Count == 0
         && requirements.Count == 0
+        && projectComponents.Count == 0
+        && componentAuditEvents.Count == 0
         && invites.Count == 0
         && memberIndexes.Count == 0
         && organizationIndexes.Count == 0)
@@ -1414,17 +1989,21 @@ static async Task ApplySeedDataIfDatabaseEmptyAsync(WebApplication app)
     db.Organisations.AddRange(organisations);
     db.Projects.AddRange(projects);
     db.Requirements.AddRange(requirements);
+    db.ProjectComponents.AddRange(projectComponents);
+    db.ComponentAuditEvents.AddRange(componentAuditEvents);
     db.OrganisationInvites.AddRange(invites);
     db.MemberProjectIndexes.AddRange(memberIndexes);
     db.OrganizationProjectIndexes.AddRange(organizationIndexes);
 
     await db.SaveChangesAsync();
     logger.LogInformation(
-        "Seed data loaded from {SeedFilePath}: organisations={Organisations}, projects={Projects}, requirements={Requirements}, invites={Invites}, memberIndexes={MemberIndexes}, organizationIndexes={OrganizationIndexes}.",
+        "Seed data loaded from {SeedFilePath}: organisations={Organisations}, projects={Projects}, requirements={Requirements}, projectComponents={ProjectComponents}, componentAuditEvents={ComponentAuditEvents}, invites={Invites}, memberIndexes={MemberIndexes}, organizationIndexes={OrganizationIndexes}.",
         seedFilePath,
         organisations.Count,
         projects.Count,
         requirements.Count,
+        projectComponents.Count,
+        componentAuditEvents.Count,
         invites.Count,
         memberIndexes.Count,
         organizationIndexes.Count
@@ -1483,10 +2062,21 @@ static string ResolveSeedFilePath(IConfiguration config, IWebHostEnvironment env
 sealed record AdminTableSnapshot(string Schema, string Name, string[] Columns, List<Dictionary<string, object?>> Rows);
 sealed record AdminConnectionInfo(string Database, string User, string Host, int? Port);
 sealed record MemberProjectRolesUpdateDto(string[] Roles);
+sealed record ForwardedComponentAuditEvent(
+    Guid ProjectId,
+    Guid ComponentId,
+    string ComponentName,
+    string Action,
+    string EditorId,
+    string EditorName,
+    DateTime EventTime
+);
 sealed record SeedDataFile(
     List<Organisation>? Organisations,
     List<Project>? Projects,
     List<Requirement>? Requirements,
+    List<ProjectComponent>? ProjectComponents,
+    List<ComponentAuditEvent>? ComponentAuditEvents,
     List<OrganisationInvite>? OrganisationInvites,
     List<MemberProjectIndex>? MemberProjectIndexes,
     List<OrganizationProjectIndex>? OrganizationProjectIndexes

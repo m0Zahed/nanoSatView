@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus,
   Trash2,
@@ -13,6 +13,8 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Activity,
+  Clock3,
 } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
@@ -20,15 +22,14 @@ import { Card } from '@/app/components/ui/card';
 import { ScrollArea } from '@/app/components/ui/scroll-area';
 import { Label } from '@/app/components/ui/label';
 import { Textarea } from '@/app/components/ui/textarea';
+import { Badge } from '@/app/components/ui/badge';
 import type { ProjectRequirement } from '@/app/api/requirements';
-
-interface Component {
-  id: string;
-  name: string;
-  type: string;
-  quantity: number;
-  notes?: string;
-}
+import type {
+  ComponentAuditEvent,
+  ComponentBuilderBlob,
+  ProjectComponent,
+  ProjectComponentEditorPayload,
+} from '@/app/api/components';
 
 interface DocumentBlob {
   id: string;
@@ -36,14 +37,6 @@ interface DocumentBlob {
   mimeType: string;
   sizeBytes: number;
   uploadedAt: string;
-}
-
-interface BuilderBlob {
-  id: string;
-  type: 'text' | 'document' | 'diagram' | 'requirement';
-  title: string;
-  content: string;
-  sourceId?: string;
 }
 
 const TRUTHY_VALUES = new Set(['1', 'true', 'yes', 'on']);
@@ -64,33 +57,135 @@ const COMPONENTS_API_BASE =
   ((typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_COMPONENTS_API_BASE_URL) as string | undefined)
     ?.replace(/\/+$/, '') || DEFAULT_COMPONENTS_API_BASE;
 
+interface ComponentDraftState {
+  name: string;
+  type: string;
+  quantity: number;
+  notes: string;
+  requirementIds: string[];
+}
+
 interface ComponentsViewProps {
   projectName: string;
-  components: string[];
+  components: ProjectComponent[];
+  componentsLoading?: boolean;
+  componentsError?: string | null;
   requirements?: ProjectRequirement[];
   requirementsLoading?: boolean;
   requirementsError?: string | null;
-  onAddComponent: (component: string) => void;
-  onRemoveComponent: (index: number) => void;
+  componentEvents?: ComponentAuditEvent[];
+  componentEventsLoading?: boolean;
+  onAddComponent: (component: ProjectComponentEditorPayload) => Promise<boolean>;
+  onUpdateComponent: (componentId: string, component: ProjectComponentEditorPayload) => Promise<boolean>;
+  onRemoveComponent: (componentId: string) => Promise<boolean>;
+}
+
+function createDefaultBuilderStack(): ComponentBuilderBlob[] {
+  return [
+    {
+      id: 'seed-text-1',
+      type: 'text',
+      title: 'Mission Context',
+      content: 'Summarize mission context and scope before detailed component references.',
+    },
+    {
+      id: 'seed-diagram-1',
+      type: 'diagram',
+      title: 'System Architecture Diagram',
+      content: 'Attach latest system architecture diagram snapshot.',
+    },
+  ];
+}
+
+function buildRequirementBlob(requirement: ProjectRequirement): ComponentBuilderBlob {
+  return {
+    id: `requirement-${requirement.id}`,
+    type: 'requirement',
+    title: requirement.reqId,
+    content: [
+      requirement.description,
+      `Subsystem: ${requirement.subsystem}`,
+      `Tags: ${requirement.tags.length > 0 ? requirement.tags.join(', ') : 'None'}`,
+      `Assigned Components: ${
+        requirement.assignedComponents.length > 0 ? requirement.assignedComponents.join(', ') : 'None'
+      }`,
+    ].join('\n'),
+    sourceId: requirement.id,
+  };
+}
+
+function buildMarkdownPreview(
+  projectName: string,
+  component: Pick<ProjectComponentEditorPayload, 'name' | 'type' | 'quantity' | 'notes'> | null,
+  linkedRequirements: ProjectRequirement[],
+  builderStack: ComponentBuilderBlob[]
+) {
+  if (!component) {
+    return '# Component Documentation\n\nNo component selected.\n';
+  }
+
+  return [
+    `# ${projectName} Component Draft`,
+    '',
+    '## Component Summary',
+    `- Name: ${component.name || 'Untitled Component'}`,
+    `- Type: ${component.type || 'Unknown'}`,
+    `- Quantity: ${component.quantity || 1}`,
+    `- Notes: ${component.notes?.trim() || 'N/A'}`,
+    '',
+    '## Builder Stack',
+    ...(builderStack.length === 0
+      ? ['- No builder content selected.']
+      : builderStack.flatMap((blob, index) => [
+          `### ${index + 1}. [${blob.type.toUpperCase()}] ${blob.title}`,
+          blob.content || '_No content_',
+          '',
+        ])),
+    '## Linked Requirements',
+    ...(linkedRequirements.length === 0
+      ? ['- No linked requirements.']
+      : linkedRequirements.map((requirement) => `- **${requirement.reqId}** ${requirement.description}`)),
+    '',
+    '## Draft Prompt',
+    'Generate a systems-engineering document section from the stack above, preserving traceability.',
+    '',
+  ].join('\n');
+}
+
+function formatTimestamp(value?: string | null) {
+  if (!value) {
+    return '-';
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleString();
 }
 
 export function ComponentsView({
   projectName,
   components,
+  componentsLoading = false,
+  componentsError = null,
   requirements = [],
   requirementsLoading = false,
   requirementsError = null,
+  componentEvents = [],
+  componentEventsLoading = false,
   onAddComponent,
+  onUpdateComponent,
   onRemoveComponent,
 }: ComponentsViewProps) {
-  const [newComponent, setNewComponent] = useState<Partial<Component>>({
+  const [newComponent, setNewComponent] = useState<ComponentDraftState>({
     name: '',
     type: '',
     quantity: 1,
     notes: '',
+    requirementIds: [],
   });
   const [isAdding, setIsAdding] = useState(false);
-  const [selectedComponentIndex, setSelectedComponentIndex] = useState<number | null>(0);
+  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'builder' | 'markdown' | 'component'>('builder');
   const [isComponentListOpen, setIsComponentListOpen] = useState(true);
   const [isSearchSectionOpen, setIsSearchSectionOpen] = useState(true);
@@ -105,22 +200,15 @@ export function ComponentsView({
   const [documents, setDocuments] = useState<DocumentBlob[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [documentsError, setDocumentsError] = useState<string | null>(null);
-  const [builderStack, setBuilderStack] = useState<BuilderBlob[]>([
-    {
-      id: 'seed-text-1',
-      type: 'text',
-      title: 'Mission Context',
-      content: 'Summarize mission context and scope before detailed component references.',
-    },
-    {
-      id: 'seed-diagram-1',
-      type: 'diagram',
-      title: 'System Architecture Diagram',
-      content: 'Attach latest system architecture diagram snapshot.',
-    },
-  ]);
+  const [builderStack, setBuilderStack] = useState<ComponentBuilderBlob[]>(createDefaultBuilderStack());
+  const [linkedRequirementIds, setLinkedRequirementIds] = useState<string[]>([]);
   const [isBuilderDropActive, setIsBuilderDropActive] = useState(false);
   const [isGeneratingMarkdown, setIsGeneratingMarkdown] = useState(false);
+  const [markdownDraft, setMarkdownDraft] = useState('# Component Documentation\n\nNo component selected.\n');
+  const [persistStatus, setPersistStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [removingComponentId, setRemovingComponentId] = useState<string | null>(null);
+
+  const saveTimeoutRef = useRef<number | null>(null);
 
   const filteredRequirements = useMemo(() => {
     const query = requirementsQuery.trim().toLowerCase();
@@ -139,85 +227,76 @@ export function ComponentsView({
       .slice(0, 20);
   }, [requirements, requirementsQuery]);
 
-  const parsedComponents: Component[] = components.map((comp, index) => {
-    try {
-      return JSON.parse(comp);
-    } catch {
-      return {
-        id: `${index}`,
-        name: comp,
-        type: 'Unknown',
-        quantity: 1,
-      };
-    }
-  });
-
-  useEffect(() => {
-    if (parsedComponents.length === 0) {
-      setSelectedComponentIndex(null);
-      return;
-    }
-    if (selectedComponentIndex === null || selectedComponentIndex >= parsedComponents.length) {
-      setSelectedComponentIndex(0);
-    }
-  }, [parsedComponents.length, selectedComponentIndex]);
-
-  const selectedComponent =
-    selectedComponentIndex === null ? null : parsedComponents[selectedComponentIndex] || null;
-
-  const selectedRequirementIds = useMemo(
-    () =>
-      new Set(
-        builderStack
-          .filter((blob) => blob.type === 'requirement' && blob.sourceId)
-          .map((blob) => blob.sourceId as string)
-      ),
-    [builderStack]
+  const selectedComponent = useMemo(
+    () => components.find((component) => component.id === selectedComponentId) || null,
+    [components, selectedComponentId]
   );
 
+  const linkedRequirements = useMemo(() => {
+    const linkedRequirementIdSet = new Set(linkedRequirementIds);
+    return requirements.filter((requirement) => linkedRequirementIdSet.has(requirement.id));
+  }, [linkedRequirementIds, requirements]);
+
   const requirementsForGeneration = useMemo(() => {
-    if (selectedRequirementIds.size > 0) {
-      return requirements.filter((requirement) => selectedRequirementIds.has(requirement.id));
+    if (linkedRequirements.length > 0) {
+      return linkedRequirements;
     }
     return filteredRequirements.slice(0, 6);
-  }, [filteredRequirements, requirements, selectedRequirementIds]);
+  }, [filteredRequirements, linkedRequirements]);
 
-  const generatedMarkdown = useMemo(() => {
-    if (!selectedComponent) {
-      return '# Component Documentation\n\nNo component selected.\n';
-    }
-
-    const requirementsBlock =
-      requirementsForGeneration.length === 0
-        ? '- No matching requirements found.'
-        : requirementsForGeneration
-            .map((req) => `- **${req.reqId}** ${req.description} (${req.subsystem})`)
-            .join('\n');
-
-    return [
-      '# Component Documentation',
-      '',
-      `## ${selectedComponent.name || 'Untitled Component'}`,
-      '',
-      `- ID: ${selectedComponent.id}`,
-      `- Type: ${selectedComponent.type || 'Unknown'}`,
-      `- Quantity: ${selectedComponent.quantity || 1}`,
-      `- Notes: ${selectedComponent.notes?.trim() || 'N/A'}`,
-      '',
-      '## Linked Requirements',
-      requirementsBlock,
-      '',
-      '## Prompt',
-      'Draft a concise test-readiness summary for this component using the linked requirements.',
-      '',
-    ].join('\n');
-  }, [requirementsForGeneration, selectedComponent]);
-
-  const [markdownDraft, setMarkdownDraft] = useState(generatedMarkdown);
+  const activeRequirementSelection = useMemo(
+    () => new Set(isAdding ? newComponent.requirementIds : linkedRequirementIds),
+    [isAdding, linkedRequirementIds, newComponent.requirementIds]
+  );
 
   useEffect(() => {
-    setMarkdownDraft(generatedMarkdown);
-  }, [generatedMarkdown]);
+    if (components.length === 0) {
+      setSelectedComponentId(null);
+      return;
+    }
+    if (!selectedComponentId || !components.some((component) => component.id === selectedComponentId)) {
+      setSelectedComponentId(components[0].id);
+    }
+  }, [components, selectedComponentId]);
+
+  useEffect(() => {
+    if (saveTimeoutRef.current) {
+      window.clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+
+    if (!selectedComponent) {
+      setLinkedRequirementIds([]);
+      setBuilderStack(createDefaultBuilderStack());
+      setMarkdownDraft('# Component Documentation\n\nNo component selected.\n');
+      setPersistStatus('idle');
+      return;
+    }
+
+    const nextBuilderStack =
+      selectedComponent.builderStack && selectedComponent.builderStack.length > 0
+        ? selectedComponent.builderStack
+        : createDefaultBuilderStack();
+    const syncedRequirements = requirements.filter((requirement) =>
+      (selectedComponent.requirementIds || []).includes(requirement.id)
+    );
+    setLinkedRequirementIds(selectedComponent.requirementIds || []);
+    setBuilderStack(nextBuilderStack);
+    setMarkdownDraft(
+      selectedComponent.markdownDraft?.trim()
+        ? selectedComponent.markdownDraft
+        : buildMarkdownPreview(projectName, selectedComponent, syncedRequirements, nextBuilderStack)
+    );
+    setPersistStatus('idle');
+  }, [projectName, requirements, selectedComponent]);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        window.clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const filteredDocs = useMemo(() => {
     const query = docsQuery.trim().toLowerCase();
@@ -255,10 +334,45 @@ export function ComponentsView({
 
   useEffect(() => {
     const id = window.setTimeout(() => {
-      refreshDocuments(docsQuery);
+      void refreshDocuments(docsQuery);
     }, 250);
     return () => window.clearTimeout(id);
   }, [docsQuery]);
+
+  const queuePersist = (
+    nextState?: Partial<Pick<ProjectComponentEditorPayload, 'builderStack' | 'markdownDraft' | 'requirementIds'>>
+  ) => {
+    if (!selectedComponent) {
+      return;
+    }
+
+    const payload: ProjectComponentEditorPayload = {
+      name: selectedComponent.name,
+      type: selectedComponent.type,
+      quantity: selectedComponent.quantity,
+      notes: selectedComponent.notes,
+      requirementIds: nextState?.requirementIds ?? linkedRequirementIds,
+      builderStack: nextState?.builderStack ?? builderStack,
+      markdownDraft: nextState?.markdownDraft ?? markdownDraft,
+    };
+
+    if (saveTimeoutRef.current) {
+      window.clearTimeout(saveTimeoutRef.current);
+    }
+
+    saveTimeoutRef.current = window.setTimeout(() => {
+      void (async () => {
+        setPersistStatus('saving');
+        const saved = await onUpdateComponent(selectedComponent.id, payload);
+        setPersistStatus(saved ? 'saved' : 'error');
+        if (saved) {
+          window.setTimeout(() => {
+            setPersistStatus((previous) => (previous === 'saved' ? 'idle' : previous));
+          }, 1200);
+        }
+      })();
+    }, 500);
+  };
 
   const onUploadDocuments = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -290,32 +404,50 @@ export function ComponentsView({
     }
   };
 
-  const addTextBlob = () => {
-    setBuilderStack((prev) => [
-      ...prev,
+  const handleAddTextBlob = () => {
+    if (!selectedComponent) {
+      return;
+    }
+
+    const nextBuilderStack = [
+      ...builderStack,
       {
         id: `text-${Date.now()}`,
         type: 'text',
         title: 'Free Text Blob',
         content: 'Add your component-specific engineering notes here.',
       },
-    ]);
+    ];
+    setBuilderStack(nextBuilderStack);
+    queuePersist({ builderStack: nextBuilderStack });
   };
 
-  const addDiagramBlob = () => {
-    setBuilderStack((prev) => [
-      ...prev,
+  const handleAddDiagramBlob = () => {
+    if (!selectedComponent) {
+      return;
+    }
+
+    const nextBuilderStack = [
+      ...builderStack,
       {
         id: `diagram-${Date.now()}`,
         type: 'diagram',
         title: 'Diagram Blob',
         content: 'Reference a saved diagram artifact.',
       },
-    ]);
+    ];
+    setBuilderStack(nextBuilderStack);
+    queuePersist({ builderStack: nextBuilderStack });
   };
 
-  const removeBlob = (id: string) => {
-    setBuilderStack((prev) => prev.filter((blob) => blob.id !== id));
+  const handleRemoveBlob = (id: string) => {
+    if (!selectedComponent) {
+      return;
+    }
+
+    const nextBuilderStack = builderStack.filter((blob) => blob.id !== id);
+    setBuilderStack(nextBuilderStack);
+    queuePersist({ builderStack: nextBuilderStack });
   };
 
   const onDocumentDragStart = (event: React.DragEvent<HTMLDivElement>, doc: DocumentBlob) => {
@@ -343,7 +475,51 @@ export function ComponentsView({
     event.dataTransfer.effectAllowed = 'copy';
   };
 
+  const toggleRequirementForActiveTarget = (requirement: ProjectRequirement) => {
+    if (!selectedComponent && !isAdding) {
+      setIsAdding(true);
+    }
+
+    if (isAdding || !selectedComponent) {
+      setNewComponent((previous) => {
+        const isSelected = previous.requirementIds.includes(requirement.id);
+        return {
+          ...previous,
+          requirementIds: isSelected
+            ? previous.requirementIds.filter((requirementId) => requirementId !== requirement.id)
+            : [...previous.requirementIds, requirement.id],
+        };
+      });
+      return;
+    }
+
+    const alreadyLinked = linkedRequirementIds.includes(requirement.id);
+    const nextRequirementIds = alreadyLinked
+      ? linkedRequirementIds.filter((requirementId) => requirementId !== requirement.id)
+      : [...linkedRequirementIds, requirement.id];
+
+    const alreadyHasBlob = builderStack.some(
+      (blob) => blob.type === 'requirement' && blob.sourceId === requirement.id
+    );
+    const nextBuilderStack = alreadyLinked
+      ? builderStack.filter((blob) => !(blob.type === 'requirement' && blob.sourceId === requirement.id))
+      : alreadyHasBlob
+        ? builderStack
+        : [...builderStack, buildRequirementBlob(requirement)];
+
+    setLinkedRequirementIds(nextRequirementIds);
+    setBuilderStack(nextBuilderStack);
+    queuePersist({
+      requirementIds: nextRequirementIds,
+      builderStack: nextBuilderStack,
+    });
+  };
+
   const onBuilderDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    if (!selectedComponent) {
+      return;
+    }
+
     event.preventDefault();
     setIsBuilderDropActive(false);
     const raw = event.dataTransfer.getData('application/json');
@@ -361,8 +537,8 @@ export function ComponentsView({
         if (!matchedDoc) {
           return;
         }
-        setBuilderStack((prev) => [
-          ...prev,
+        const nextBuilderStack = [
+          ...builderStack,
           {
             id: `document-${Date.now()}`,
             type: 'document',
@@ -370,7 +546,9 @@ export function ComponentsView({
             content: `Doc ${matchedDoc.id} (${matchedDoc.mimeType}, ${matchedDoc.sizeBytes} bytes)`,
             sourceId: matchedDoc.id,
           },
-        ]);
+        ];
+        setBuilderStack(nextBuilderStack);
+        queuePersist({ builderStack: nextBuilderStack });
         return;
       }
 
@@ -379,25 +557,23 @@ export function ComponentsView({
         if (!matchedRequirement) {
           return;
         }
-        setBuilderStack((prev) => [
-          ...prev,
+
+        const nextRequirementIds = linkedRequirementIds.includes(matchedRequirement.id)
+          ? linkedRequirementIds
+          : [...linkedRequirementIds, matchedRequirement.id];
+        const nextBuilderStack = [
+          ...builderStack,
           {
             id: `requirement-${Date.now()}`,
-            type: 'requirement',
-            title: matchedRequirement.reqId,
-            content: [
-              matchedRequirement.description,
-              `Subsystem: ${matchedRequirement.subsystem}`,
-              `Tags: ${matchedRequirement.tags.length > 0 ? matchedRequirement.tags.join(', ') : 'None'}`,
-              `Assigned Components: ${
-                matchedRequirement.assignedComponents.length > 0
-                  ? matchedRequirement.assignedComponents.join(', ')
-                  : 'None'
-              }`,
-            ].join('\n'),
-            sourceId: matchedRequirement.id,
+            ...buildRequirementBlob(matchedRequirement),
           },
-        ]);
+        ];
+        setLinkedRequirementIds(nextRequirementIds);
+        setBuilderStack(nextBuilderStack);
+        queuePersist({
+          requirementIds: nextRequirementIds,
+          builderStack: nextBuilderStack,
+        });
       }
     } catch {
       // Ignore malformed drag payload.
@@ -405,6 +581,10 @@ export function ComponentsView({
   };
 
   const generateMarkdownFromStack = async () => {
+    if (!selectedComponent) {
+      return;
+    }
+
     setIsGeneratingMarkdown(true);
     try {
       const response = await fetch(`${COMPONENTS_API_BASE}/api/v1/markdown/from-stack`, {
@@ -414,7 +594,13 @@ export function ComponentsView({
         },
         body: JSON.stringify({
           projectName,
-          component: selectedComponent,
+          component: {
+            id: selectedComponent.id,
+            name: selectedComponent.name,
+            type: selectedComponent.type,
+            quantity: selectedComponent.quantity,
+            notes: selectedComponent.notes,
+          },
           requirements: requirementsForGeneration,
           stack: builderStack,
         }),
@@ -424,6 +610,7 @@ export function ComponentsView({
         const payload = (await response.json()) as { markdown?: string };
         if (payload.markdown && payload.markdown.trim()) {
           setMarkdownDraft(payload.markdown);
+          queuePersist({ markdownDraft: payload.markdown });
           setActiveTab('markdown');
           return;
         }
@@ -434,42 +621,81 @@ export function ComponentsView({
       setIsGeneratingMarkdown(false);
     }
 
-    const fallback = [
-      `# ${projectName} Document Draft`,
-      '',
-      `## Component`,
-      selectedComponent ? `- ${selectedComponent.name} (${selectedComponent.type})` : '- None selected',
-      '',
-      '## Stack',
-      ...builderStack.map((blob, index) => `### ${index + 1}. [${blob.type.toUpperCase()}] ${blob.title}\n${blob.content}`),
-      '',
-      '## Requirements Snapshot',
-      ...requirementsForGeneration.map((req) => `- **${req.reqId}** ${req.description}`),
-      '',
-    ].join('\n');
+    const fallback = buildMarkdownPreview(projectName, selectedComponent, requirementsForGeneration, builderStack);
     setMarkdownDraft(fallback);
+    queuePersist({ markdownDraft: fallback });
     setActiveTab('markdown');
   };
 
-  const handleAdd = () => {
-    if (newComponent.name && newComponent.type) {
-      const component: Component = {
-        id: Date.now().toString(),
-        name: newComponent.name,
-        type: newComponent.type,
-        quantity: newComponent.quantity || 1,
-        notes: newComponent.notes,
-      };
-      onAddComponent(JSON.stringify(component));
-      setNewComponent({
-        name: '',
-        type: '',
-        quantity: 1,
-        notes: '',
-      });
-      setIsAdding(false);
+  const handleCreateComponent = async () => {
+    const name = newComponent.name.trim();
+    const type = newComponent.type.trim();
+    if (!name || !type) {
+      return;
     }
+
+    const linkedDraftRequirements = requirements.filter((requirement) =>
+      newComponent.requirementIds.includes(requirement.id)
+    );
+    const initialBuilderStack = [
+      ...createDefaultBuilderStack(),
+      ...linkedDraftRequirements.map((requirement) => buildRequirementBlob(requirement)),
+    ];
+    const payload: ProjectComponentEditorPayload = {
+      name,
+      type,
+      quantity: newComponent.quantity || 1,
+      notes: newComponent.notes.trim(),
+      requirementIds: newComponent.requirementIds,
+      builderStack: initialBuilderStack,
+      markdownDraft: buildMarkdownPreview(
+        projectName,
+        {
+          name,
+          type,
+          quantity: newComponent.quantity || 1,
+          notes: newComponent.notes.trim(),
+          requirementIds: newComponent.requirementIds,
+          builderStack: initialBuilderStack,
+          markdownDraft: '',
+        },
+        linkedDraftRequirements,
+        initialBuilderStack
+      ),
+    };
+
+    const saved = await onAddComponent(payload);
+    if (!saved) {
+      return;
+    }
+
+    setNewComponent({
+      name: '',
+      type: '',
+      quantity: 1,
+      notes: '',
+      requirementIds: [],
+    });
+    setIsAdding(false);
+    setSelectedComponentId(null);
   };
+
+  const handleRemoveComponent = async (componentId: string) => {
+    setRemovingComponentId(componentId);
+    await onRemoveComponent(componentId);
+    setRemovingComponentId(null);
+  };
+
+  const statusLabel =
+    persistStatus === 'saving'
+      ? 'Saving component...'
+      : persistStatus === 'saved'
+        ? 'Saved'
+        : persistStatus === 'error'
+          ? 'Save failed'
+          : selectedComponent
+            ? `Last edited by ${selectedComponent.lastEditedByName || selectedComponent.lastEditedBy}`
+            : 'Select a component to edit';
 
   return (
     <div className="flex-1 flex h-full bg-[#111113] text-white overflow-x-auto">
@@ -535,6 +761,7 @@ export function ComponentsView({
                 <p className="text-xs text-gray-400 font-mono">Components Panel</p>
                 <h2 className="text-lg font-serif">Components</h2>
                 <p className="text-xs text-gray-400 font-mono mt-2">{projectName}</p>
+                <p className="text-[11px] text-gray-500 font-mono mt-2">{statusLabel}</p>
               </div>
               <button
                 type="button"
@@ -559,17 +786,30 @@ export function ComponentsView({
           {isComponentListOpen && (
             <ScrollArea className="flex-1">
               <div className="px-4 py-4 space-y-2">
-                {parsedComponents.length === 0 ? (
+                {componentsLoading ? (
                   <div className="text-sm text-gray-400 font-mono border border-white/10 bg-white/5 p-3">
-                    No components yet. Add one to start scoping tools.
+                    Loading components...
+                  </div>
+                ) : null}
+                {componentsError ? (
+                  <div className="text-sm text-red-400 font-mono border border-red-400/20 bg-red-500/5 p-3">
+                    {componentsError}
+                  </div>
+                ) : null}
+                {!componentsLoading && components.length === 0 ? (
+                  <div className="text-sm text-gray-400 font-mono border border-white/10 bg-white/5 p-3">
+                    No components yet. Add one to start linking requirements and saving builder state.
                   </div>
                 ) : (
-                  parsedComponents.map((component, index) => (
+                  components.map((component, index) => (
                     <button
                       key={component.id}
-                      onClick={() => setSelectedComponentIndex(index)}
+                      onClick={() => {
+                        setSelectedComponentId(component.id);
+                        setIsAdding(false);
+                      }}
                       className={`w-full text-left px-3 py-2 border font-mono text-sm transition-colors ${
-                        selectedComponentIndex === index
+                        selectedComponentId === component.id
                           ? 'border-white/40 bg-white/10 text-white'
                           : 'border-white/10 text-gray-300 hover:bg-white/5'
                       }`}
@@ -582,16 +822,20 @@ export function ComponentsView({
                             type="button"
                             onClick={(event) => {
                               event.stopPropagation();
-                              onRemoveComponent(index);
+                              void handleRemoveComponent(component.id);
                             }}
                             className="text-gray-500 hover:text-red-300 transition-colors"
                             aria-label={`Remove component ${index + 1}`}
+                            disabled={removingComponentId === component.id}
                           >
                             <Trash2 className="h-3 w-3" />
                           </button>
                         </div>
                       </div>
                       <div className="text-xs text-gray-400 mt-1">{component.name || 'Untitled'}</div>
+                      <div className="text-[11px] text-gray-500 mt-1">
+                        {component.lastEditedByName || component.lastEditedBy} · {formatTimestamp(component.updatedAt)}
+                      </div>
                     </button>
                   ))
                 )}
@@ -628,7 +872,7 @@ export function ComponentsView({
                       min="1"
                       value={newComponent.quantity}
                       onChange={(e) =>
-                        setNewComponent({ ...newComponent, quantity: parseInt(e.target.value) || 1 })
+                        setNewComponent({ ...newComponent, quantity: parseInt(e.target.value, 10) || 1 })
                       }
                       className="bg-[#0f0f12] border-white/10 text-white rounded-none font-mono w-20"
                     />
@@ -636,25 +880,31 @@ export function ComponentsView({
                       placeholder="Notes"
                       value={newComponent.notes}
                       onChange={(e) => setNewComponent({ ...newComponent, notes: e.target.value })}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handleAdd();
-                        } else if (e.key === 'Escape') {
-                          setIsAdding(false);
-                          setNewComponent({
-                            name: '',
-                            type: '',
-                            quantity: 1,
-                            notes: '',
-                          });
-                        }
-                      }}
                       className="bg-[#0f0f12] border-white/10 text-white rounded-none font-mono"
                     />
                   </div>
+                  <div>
+                    <p className="text-[11px] text-gray-400 font-mono mb-2">Clicked requirements</p>
+                    <div className="flex flex-wrap gap-2 min-h-8">
+                      {newComponent.requirementIds.length === 0 ? (
+                        <span className="text-[11px] text-gray-500 font-mono">
+                          Click requirement cards to stage links on creation.
+                        </span>
+                      ) : (
+                        newComponent.requirementIds.map((requirementId) => {
+                          const matchedRequirement = requirements.find((requirement) => requirement.id === requirementId);
+                          return (
+                            <Badge key={requirementId} variant="secondary" className="rounded-none">
+                              {matchedRequirement?.reqId || requirementId}
+                            </Badge>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
                   <div className="flex gap-2">
                     <Button
-                      onClick={handleAdd}
+                      onClick={() => void handleCreateComponent()}
                       size="sm"
                       className="bg-white text-black hover:bg-gray-200 rounded-none font-mono"
                     >
@@ -669,6 +919,7 @@ export function ComponentsView({
                           type: '',
                           quantity: 1,
                           notes: '',
+                          requirementIds: [],
                         });
                       }}
                       size="sm"
@@ -740,7 +991,7 @@ export function ComponentsView({
               <div>
                 <h3 className="text-base font-serif">Tools searching section</h3>
                 <p className="text-xs text-gray-400 font-mono mt-1">
-                  Scoped to {selectedComponentIndex === null ? 'no component' : `Component ${selectedComponentIndex + 1}`}
+                  Scoped to {selectedComponent ? selectedComponent.name : isAdding ? 'new component draft' : 'no component'}
                 </p>
               </div>
               <button
@@ -778,7 +1029,7 @@ export function ComponentsView({
                     className="bg-[#0f0f12] border-white/10 text-white rounded-none font-mono"
                   />
                   <div className="text-xs text-gray-400 font-mono">
-                    Searches the full project requirement set. Drag cards into the builder canvas.
+                    Searches the full project requirement set. Click to link requirements, or drag cards into the builder canvas.
                   </div>
                   {requirementsLoading ? (
                     <div className="text-xs text-gray-500 font-mono">Loading requirements...</div>
@@ -790,32 +1041,38 @@ export function ComponentsView({
                     {!requirementsLoading && filteredRequirements.length === 0 ? (
                       <div className="p-3 text-xs text-gray-500 font-mono">No matching requirements</div>
                     ) : (
-                      filteredRequirements.map((requirement) => (
-                        <div
-                          key={requirement.id}
-                          draggable
-                          onDragStart={(event) => onRequirementDragStart(event, requirement)}
-                          className="p-3 border-b border-white/10 last:border-b-0 hover:bg-white/5 cursor-grab active:cursor-grabbing"
-                          data-testid={`requirement-card-${requirement.id}`}
-                        >
-                          <p className="text-xs text-gray-400 font-mono">{requirement.reqId}</p>
-                          <p className="text-xs text-gray-400 font-mono mt-1 line-clamp-2">
-                            {requirement.description}
-                          </p>
-                          <p className="text-[11px] text-gray-500 font-mono mt-1">
-                            {requirement.subsystem}
-                          </p>
-                          <p className="text-[11px] text-gray-500 font-mono mt-1">
-                            Tags: {requirement.tags.length > 0 ? requirement.tags.join(', ') : 'None'}
-                          </p>
-                          <p className="text-[11px] text-gray-500 font-mono mt-1">
-                            Assigned: {requirement.assignedComponents.length > 0 ? requirement.assignedComponents.join(', ') : 'None'}
-                          </p>
-                          <p className="text-[11px] text-gray-500 font-mono mt-1">
-                            Drag into Document Builder canvas
-                          </p>
-                        </div>
-                      ))
+                      filteredRequirements.map((requirement) => {
+                        const isLinked = activeRequirementSelection.has(requirement.id);
+                        return (
+                          <div
+                            key={requirement.id}
+                            draggable
+                            onDragStart={(event) => onRequirementDragStart(event, requirement)}
+                            onClick={() => toggleRequirementForActiveTarget(requirement)}
+                            className={`p-3 border-b border-white/10 last:border-b-0 hover:bg-white/5 cursor-pointer ${
+                              isLinked ? 'bg-white/10 border-l-2 border-l-white/70' : ''
+                            }`}
+                            data-testid={`requirement-card-${requirement.id}`}
+                          >
+                            <p className="text-xs text-gray-400 font-mono">{requirement.reqId}</p>
+                            <p className="text-xs text-gray-400 font-mono mt-1 line-clamp-2">
+                              {requirement.description}
+                            </p>
+                            <p className="text-[11px] text-gray-500 font-mono mt-1">
+                              {requirement.subsystem}
+                            </p>
+                            <p className="text-[11px] text-gray-500 font-mono mt-1">
+                              Tags: {requirement.tags.length > 0 ? requirement.tags.join(', ') : 'None'}
+                            </p>
+                            <p className="text-[11px] text-gray-500 font-mono mt-1">
+                              Assigned: {requirement.assignedComponents.length > 0 ? requirement.assignedComponents.join(', ') : 'None'}
+                            </p>
+                            <p className="text-[11px] text-gray-500 font-mono mt-1">
+                              {isLinked ? 'Linked to active component' : 'Click to link or drag into Document Builder canvas'}
+                            </p>
+                          </div>
+                        );
+                      })
                     )}
                   </div>
                 </Card>
@@ -886,6 +1143,32 @@ export function ComponentsView({
 
                 <Card className="p-4 bg-[#151518] border-white/10 rounded-none space-y-3">
                   <div className="flex items-center gap-2 text-sm font-mono">
+                    <Activity className="h-4 w-4 text-gray-400" />
+                    Live Component Activity
+                  </div>
+                  <div className="text-xs text-gray-400 font-mono">
+                    Recent edits refresh from the backend and are also forwarded to Kafka monitoring.
+                  </div>
+                  {componentEventsLoading ? (
+                    <p className="text-xs text-gray-500 font-mono">Loading activity...</p>
+                  ) : componentEvents.length === 0 ? (
+                    <p className="text-xs text-gray-500 font-mono">No component activity yet.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-48 overflow-auto">
+                      {componentEvents.slice(0, 8).map((event) => (
+                        <div key={event.id} className="border border-white/10 bg-black/20 p-2">
+                          <p className="text-xs text-white font-mono">
+                            {event.editorName || event.editorId} {event.action} {event.componentName}
+                          </p>
+                          <p className="text-[11px] text-gray-500 font-mono mt-1">{formatTimestamp(event.eventTime)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+
+                <Card className="p-4 bg-[#151518] border-white/10 rounded-none space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-mono">
                     <Calendar className="h-4 w-4 text-gray-400" />
                     Timeline
                   </div>
@@ -909,8 +1192,7 @@ export function ComponentsView({
         <div className="px-6 py-4 border-b border-white/10">
           <h1 className="text-xl font-serif">Components</h1>
           <p className="text-xs text-gray-400 font-mono mt-2">
-            A multi-pane web application for systems engineering documentation, requirements management,
-            and AI-assisted document generation and verification.
+            Persisted component drafts with linked requirements, document-builder state, and live edit activity.
           </p>
           <div className="mt-4 flex gap-2">
             <button
@@ -952,12 +1234,22 @@ export function ComponentsView({
               <div className="grid grid-cols-[minmax(0,1fr)_220px] gap-6">
                 <div className="space-y-4">
                   <Card className="p-5 bg-[#151518] border-white/10 rounded-none min-h-[320px]">
-                    <div className="text-xs text-gray-400 font-mono mb-3">Document canvas</div>
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <div className="text-xs text-gray-400 font-mono">Document canvas</div>
+                      {selectedComponent ? (
+                        <div className="text-[11px] text-gray-500 font-mono">
+                          {selectedComponent.name} · {formatTimestamp(selectedComponent.updatedAt)}
+                        </div>
+                      ) : null}
+                    </div>
                     <div
                       className={`space-y-3 text-sm font-mono min-h-[220px] border border-dashed p-3 transition-colors ${
                         isBuilderDropActive ? 'border-white/60 bg-white/5' : 'border-white/10 bg-black/20'
                       }`}
                       onDragOver={(event) => {
+                        if (!selectedComponent) {
+                          return;
+                        }
                         event.preventDefault();
                         setIsBuilderDropActive(true);
                       }}
@@ -965,7 +1257,11 @@ export function ComponentsView({
                       onDrop={onBuilderDrop}
                       data-testid="builder-drop-zone"
                     >
-                      {builderStack.length === 0 ? (
+                      {!selectedComponent ? (
+                        <div className="text-xs text-gray-500">
+                          Select or create a component before building its document stack.
+                        </div>
+                      ) : builderStack.length === 0 ? (
                         <div className="text-xs text-gray-500">
                           Drop document or requirement cards here to build your stack.
                         </div>
@@ -980,12 +1276,12 @@ export function ComponentsView({
                               <div>
                                 <p className="text-xs text-gray-400 uppercase tracking-wide">{blob.type}</p>
                                 <p className="text-sm text-white">{blob.title}</p>
-                                <p className="text-xs text-gray-400 mt-1">{blob.content}</p>
+                                <p className="text-xs text-gray-400 mt-1 whitespace-pre-wrap">{blob.content}</p>
                               </div>
                               <button
                                 type="button"
                                 className="text-gray-500 hover:text-red-300"
-                                onClick={() => removeBlob(blob.id)}
+                                onClick={() => handleRemoveBlob(blob.id)}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>
@@ -1004,8 +1300,8 @@ export function ComponentsView({
                     <div className="mt-4 flex gap-2">
                       <Button
                         className="bg-white text-black hover:bg-gray-200 rounded-none font-mono text-xs"
-                        onClick={generateMarkdownFromStack}
-                        disabled={isGeneratingMarkdown}
+                        onClick={() => void generateMarkdownFromStack()}
+                        disabled={isGeneratingMarkdown || !selectedComponent}
                       >
                         {isGeneratingMarkdown ? 'Generating...' : 'Generate Markdown from Stack'}
                       </Button>
@@ -1027,17 +1323,33 @@ export function ComponentsView({
                   <div className="space-y-3">
                     <Button
                       className="w-full bg-white text-black hover:bg-gray-200 rounded-none font-mono text-xs"
-                      onClick={addTextBlob}
+                      onClick={handleAddTextBlob}
+                      disabled={!selectedComponent}
                     >
                       Add text
                     </Button>
                     <Button
                       variant="outline"
                       className="w-full border-white/10 text-gray-300 hover:text-white rounded-none font-mono text-xs"
-                      onClick={addDiagramBlob}
+                      onClick={handleAddDiagramBlob}
+                      disabled={!selectedComponent}
                     >
                       Add diagram
                     </Button>
+                    <div className="border border-white/10 bg-black/20 p-3">
+                      <p className="text-[11px] text-gray-500 font-mono">Linked requirements</p>
+                      <div className="flex flex-wrap gap-2 mt-2 min-h-6">
+                        {linkedRequirements.length === 0 ? (
+                          <span className="text-[11px] text-gray-500 font-mono">None linked yet.</span>
+                        ) : (
+                          linkedRequirements.map((requirement) => (
+                            <Badge key={requirement.id} variant="secondary" className="rounded-none">
+                              {requirement.reqId}
+                            </Badge>
+                          ))
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </Card>
               </div>
@@ -1045,10 +1357,22 @@ export function ComponentsView({
           ) : activeTab === 'markdown' ? (
             <div className="p-6 space-y-4">
               <Card className="p-5 bg-[#151518] border-white/10 rounded-none">
-                <div className="text-xs text-gray-400 font-mono mb-3">Generated markdown (editable)</div>
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <div className="text-xs text-gray-400 font-mono">Generated markdown (editable)</div>
+                  <div className="text-[11px] text-gray-500 font-mono">
+                    {selectedComponent ? `Persisted to ${selectedComponent.name}` : 'No component selected'}
+                  </div>
+                </div>
                 <Textarea
                   value={markdownDraft}
-                  onChange={(e) => setMarkdownDraft(e.target.value)}
+                  onChange={(e) => {
+                    const nextMarkdown = e.target.value;
+                    setMarkdownDraft(nextMarkdown);
+                    if (selectedComponent) {
+                      queuePersist({ markdownDraft: nextMarkdown });
+                    }
+                  }}
+                  disabled={!selectedComponent}
                   className="min-h-[520px] bg-[#0f0f12] border-white/10 text-white rounded-none font-mono text-xs"
                 />
               </Card>
@@ -1058,11 +1382,30 @@ export function ComponentsView({
               <Card className="p-5 bg-[#151518] border-white/10 rounded-none">
                 <div className="text-xs text-gray-400 font-mono mb-2">Selected component</div>
                 {selectedComponent ? (
-                  <div className="space-y-2 text-sm font-mono">
+                  <div className="space-y-3 text-sm font-mono">
                     <p className="text-white">{selectedComponent.name || 'Untitled Component'}</p>
                     <p className="text-xs text-gray-400">Type: {selectedComponent.type || 'Unknown'}</p>
                     <p className="text-xs text-gray-400">Quantity: {selectedComponent.quantity || 1}</p>
                     <p className="text-xs text-gray-400">Notes: {selectedComponent.notes?.trim() || 'N/A'}</p>
+                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                      <Clock3 className="h-3 w-3" />
+                      {selectedComponent.lastEditedByName || selectedComponent.lastEditedBy} ·{' '}
+                      {formatTimestamp(selectedComponent.lastEditedAt)}
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-xs text-gray-400">Linked requirements</p>
+                      <div className="flex flex-wrap gap-2">
+                        {linkedRequirements.length === 0 ? (
+                          <span className="text-xs text-gray-500">None</span>
+                        ) : (
+                          linkedRequirements.map((requirement) => (
+                            <Badge key={requirement.id} variant="secondary" className="rounded-none">
+                              {requirement.reqId}
+                            </Badge>
+                          ))
+                        )}
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <p className="text-sm text-gray-400 font-mono">No component selected.</p>
@@ -1070,11 +1413,21 @@ export function ComponentsView({
               </Card>
               <Card className="p-4 bg-[#151518] border-white/10 rounded-none">
                 <div className="flex items-center gap-2 text-sm font-mono">
-                  <CheckCircle2 className="h-4 w-4 text-gray-400" />
-                  Integrate Google Chats
+                  <Activity className="h-4 w-4 text-gray-400" />
+                  Kafka-backed Edit Activity
                 </div>
                 <div className="text-xs text-gray-400 font-mono mt-2">
-                  Imports discussion context for verification.
+                  Component saves publish editor updates through the monitoring pipeline and refresh across users.
+                </div>
+                <div className="mt-3 space-y-2">
+                  {componentEvents.slice(0, 5).map((event) => (
+                    <div key={event.id} className="border border-white/10 bg-black/20 p-2">
+                      <p className="text-xs text-white font-mono">
+                        {event.editorName || event.editorId} {event.action} {event.componentName}
+                      </p>
+                      <p className="text-[11px] text-gray-500 font-mono mt-1">{formatTimestamp(event.eventTime)}</p>
+                    </div>
+                  ))}
                 </div>
               </Card>
               <Card className="p-4 bg-[#151518] border-white/10 rounded-none">

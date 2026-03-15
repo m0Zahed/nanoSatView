@@ -5,8 +5,7 @@ public record RequirementCreateDto(
     string Description,
     string Subsystem,
     Guid ProjectId,
-    string[] Tags,
-    string[] AssignedComponents
+    string[] Tags
 );
 
 public record RequirementUpdateDto(
@@ -14,6 +13,15 @@ public record RequirementUpdateDto(
     string Description,
     string Subsystem,
     Guid ProjectId,
+    string[] Tags
+);
+
+public record RequirementResponseDto(
+    Guid Id,
+    string ReqId,
+    string Description,
+    string Subsystem,
     string[] Tags,
-    string[] AssignedComponents
+    string[] AssignedComponents,
+    Guid ProjectId
 );

@@ -54,6 +54,11 @@ coverage/
 .venv/
 **/.venv/
 
+### Python
+__pycache__/
+*.pyc
+*.pyo
+
 ### Typesense data
 typesense-data/
 typesense_server/

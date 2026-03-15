@@ -42,6 +42,8 @@ public class Project
     public string OrganizationId { get; set; } = string.Empty;
 
     public ICollection<Requirement> Requirements { get; set; } = new List<Requirement>();
+    public ICollection<ProjectComponent> Components { get; set; } = new List<ProjectComponent>();
+    public ICollection<ComponentAuditEvent> ComponentAuditEvents { get; set; } = new List<ComponentAuditEvent>();
 
     [MaxLength(200)]
     public string ComponentsListId { get; set; } = string.Empty;

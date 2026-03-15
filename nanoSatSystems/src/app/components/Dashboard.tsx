@@ -31,6 +31,16 @@ import {
   type RequirementPayload,
 } from '@/app/api/requirements';
 import {
+  createComponent as apiCreateComponent,
+  deleteComponent as apiDeleteComponent,
+  fetchProjectComponentEvents,
+  fetchProjectComponents,
+  updateComponent as apiUpdateComponent,
+  type ComponentAuditEvent,
+  type ProjectComponent,
+  type ProjectComponentEditorPayload,
+} from '@/app/api/components';
+import {
   createOrganization as apiCreateOrganization,
   createProject as apiCreateProject,
   deleteProject as apiDeleteProject,
@@ -60,7 +70,7 @@ interface Project {
   members?: Member[];
   requirements?: ProjectRequirement[];
   timeline?: string;
-  components?: string[];
+  components?: ProjectComponent[];
 }
 
 interface JoinRequest {
@@ -188,6 +198,11 @@ export function Dashboard() {
   const [requirementsLoadedByProject, setRequirementsLoadedByProject] = useState<Record<string, boolean>>({});
   const [requirementsLoadingByProject, setRequirementsLoadingByProject] = useState<Record<string, boolean>>({});
   const [requirementsErrorByProject, setRequirementsErrorByProject] = useState<Record<string, string | null>>({});
+  const [componentsLoadedByProject, setComponentsLoadedByProject] = useState<Record<string, boolean>>({});
+  const [componentsLoadingByProject, setComponentsLoadingByProject] = useState<Record<string, boolean>>({});
+  const [componentsErrorByProject, setComponentsErrorByProject] = useState<Record<string, string | null>>({});
+  const [componentEventsByProject, setComponentEventsByProject] = useState<Record<string, ComponentAuditEvent[]>>({});
+  const [componentEventsLoadingByProject, setComponentEventsLoadingByProject] = useState<Record<string, boolean>>({});
 
   // Organization member directory
   const [members, setMembers] = useState<Member[]>([]);
@@ -290,7 +305,7 @@ export function Dashboard() {
                 .filter((member): member is Member => Boolean(member)),
               requirements: [],
               timeline: p.timelineId || '',
-              components: p.componentsListId ? [p.componentsListId] : [],
+              components: [],
             }))
           );
 
@@ -394,7 +409,7 @@ export function Dashboard() {
             members: currentUserMember ? [currentUserMember] : [],
             requirements: [],
             timeline: p.timelineId || '',
-            components: p.componentsListId ? [p.componentsListId] : [],
+            components: [],
           }));
           setProjects(mapped);
         }
@@ -409,6 +424,10 @@ export function Dashboard() {
   }, [user]);
 
   const currentUserId = useMemo(() => user?.id ?? user?.email ?? 'me', [user]);
+  const currentUserName = useMemo(
+    () => user?.fullName?.trim() || user?.username?.trim() || user?.email || 'Unknown User',
+    [user]
+  );
 
   const loadRequirementsForProject = async (projectId: string) => {
     setRequirementsLoadingByProject((previous) => ({ ...previous, [projectId]: true }));
@@ -441,6 +460,50 @@ export function Dashboard() {
     setRequirementsLoadingByProject((previous) => ({ ...previous, [projectId]: false }));
   };
 
+  const loadComponentsForProject = async (projectId: string) => {
+    setComponentsLoadingByProject((previous) => ({ ...previous, [projectId]: true }));
+    setComponentsErrorByProject((previous) => ({ ...previous, [projectId]: null }));
+
+    const { status, data } = await fetchProjectComponents(projectId);
+    if (status === 200 && Array.isArray(data)) {
+      const projectComponents = data as ProjectComponent[];
+      setProjects((previous) =>
+        previous.map((project) =>
+          project.id === projectId
+            ? {
+                ...project,
+                components: projectComponents,
+              }
+            : project
+        )
+      );
+      setComponentsLoadedByProject((previous) => ({ ...previous, [projectId]: true }));
+      setComponentsLoadingByProject((previous) => ({ ...previous, [projectId]: false }));
+      return;
+    }
+
+    const errorMessage =
+      data && typeof data === 'object' && 'error' in data && data.error && typeof data.error === 'object' && 'message' in data.error
+        ? String(data.error.message)
+        : 'Failed to load components.';
+
+    setComponentsErrorByProject((previous) => ({ ...previous, [projectId]: errorMessage }));
+    setComponentsLoadingByProject((previous) => ({ ...previous, [projectId]: false }));
+  };
+
+  const loadComponentEventsForProject = async (projectId: string) => {
+    setComponentEventsLoadingByProject((previous) => ({ ...previous, [projectId]: true }));
+
+    const { status, data } = await fetchProjectComponentEvents(projectId);
+    if (status === 200 && Array.isArray(data)) {
+      setComponentEventsByProject((previous) => ({ ...previous, [projectId]: data as ComponentAuditEvent[] }));
+      setComponentEventsLoadingByProject((previous) => ({ ...previous, [projectId]: false }));
+      return;
+    }
+
+    setComponentEventsLoadingByProject((previous) => ({ ...previous, [projectId]: false }));
+  };
+
   useEffect(() => {
     if (
       !selectedProjectId ||
@@ -458,6 +521,65 @@ export function Dashboard() {
 
     void loadRequirementsForProject(selectedProjectId);
   }, [projects, requirementsErrorByProject, requirementsLoadedByProject, requirementsLoadingByProject, selectedProjectId]);
+
+  useEffect(() => {
+    if (
+      currentView !== 'components' ||
+      !selectedProjectId ||
+      componentsLoadedByProject[selectedProjectId] ||
+      componentsLoadingByProject[selectedProjectId] ||
+      componentsErrorByProject[selectedProjectId]
+    ) {
+      return;
+    }
+
+    const selectedProjectExists = projects.some((project) => project.id === selectedProjectId);
+    if (!selectedProjectExists) {
+      return;
+    }
+
+    void loadComponentsForProject(selectedProjectId);
+    void loadComponentEventsForProject(selectedProjectId);
+  }, [
+    componentsErrorByProject,
+    componentsLoadedByProject,
+    componentsLoadingByProject,
+    currentView,
+    projects,
+    selectedProjectId,
+  ]);
+
+  useEffect(() => {
+    if (!selectedProjectId || currentView !== 'components') {
+      return;
+    }
+
+    void loadComponentsForProject(selectedProjectId);
+    void loadComponentEventsForProject(selectedProjectId);
+    void loadRequirementsForProject(selectedProjectId);
+
+    const intervalId = window.setInterval(() => {
+      void loadComponentsForProject(selectedProjectId);
+      void loadComponentEventsForProject(selectedProjectId);
+      void loadRequirementsForProject(selectedProjectId);
+    }, 4000);
+
+    return () => window.clearInterval(intervalId);
+  }, [currentView, selectedProjectId]);
+
+  useEffect(() => {
+    if (!selectedProjectId || currentView !== 'requirements') {
+      return;
+    }
+
+    void loadRequirementsForProject(selectedProjectId);
+
+    const intervalId = window.setInterval(() => {
+      void loadRequirementsForProject(selectedProjectId);
+    }, 4000);
+
+    return () => window.clearInterval(intervalId);
+  }, [currentView, selectedProjectId]);
   
   // Create a new organisation 
   const handleCreateOrganization = async () => {
@@ -544,7 +666,7 @@ export function Dashboard() {
             members: members,
             requirements: [],
             timeline: p.timelineId || '',
-            components: p.componentsListId ? [p.componentsListId] : [],
+            components: [],
           }))
         );
         setProjects(mappedProjects);
@@ -597,7 +719,7 @@ export function Dashboard() {
         members: members,
         requirements: [],
         timeline: projData.timelineId || '',
-        components: projData.componentsListId ? [projData.componentsListId] : [],
+        components: [],
       };
       
       // Set the projects list
@@ -801,6 +923,7 @@ export function Dashboard() {
           };
         })
       );
+      void loadComponentsForProject(selectedProjectId);
       setAlertMessage('Requirement removed successfully!');
       setShowSuccessAlert(true);
       return true;
@@ -847,44 +970,117 @@ export function Dashboard() {
   const handleOpenAddComponents = (projectId: string) => {
     setRequirementsLoadedByProject((previous) => ({ ...previous, [projectId]: false }));
     setRequirementsErrorByProject((previous) => ({ ...previous, [projectId]: null }));
+    setComponentsLoadedByProject((previous) => ({ ...previous, [projectId]: false }));
+    setComponentsErrorByProject((previous) => ({ ...previous, [projectId]: null }));
     setSelectedProjectId(projectId);
     setCurrentView('components');
   };
 
-  const handleAddComponentInView = (component: string) => {
-    if (!selectedProjectId) return;
+  const handleAddComponentInView = async (component: ProjectComponentEditorPayload) => {
+    if (!selectedProjectId) {
+      return false;
+    }
 
-    setProjects(projects.map((project) => {
-      if (project.id === selectedProjectId) {
-        const currentComponents = project.components || [];
-        return {
-          ...project,
-          components: [...currentComponents, component],
-        };
-      }
-      return project;
-    }));
+    const { status, data } = await apiCreateComponent({
+      ...component,
+      projectId: selectedProjectId,
+      editorId: currentUserId,
+      editorName: currentUserName,
+    });
 
-    setAlertMessage('Component added successfully!');
+    if (status === 201 && data && typeof data === 'object' && 'id' in data) {
+      const createdComponent = data as ProjectComponent;
+      setProjects((previous) =>
+        previous.map((project) => {
+          if (project.id !== selectedProjectId) {
+            return project;
+          }
+          const currentComponents = project.components || [];
+          return {
+            ...project,
+            components: [createdComponent, ...currentComponents],
+          };
+        })
+      );
+      setComponentsLoadedByProject((previous) => ({ ...previous, [selectedProjectId]: true }));
+      void loadRequirementsForProject(selectedProjectId);
+      void loadComponentEventsForProject(selectedProjectId);
+      setAlertMessage('Component added successfully!');
+      setShowSuccessAlert(true);
+      return true;
+    }
+
+    setAlertMessage('Failed to add component.');
     setShowSuccessAlert(true);
+    return false;
   };
 
-  const handleRemoveComponent = (index: number) => {
-    if (!selectedProjectId) return;
+  const handleUpdateComponentInView = async (componentId: string, component: ProjectComponentEditorPayload) => {
+    if (!selectedProjectId) {
+      return false;
+    }
 
-    setProjects(projects.map((project) => {
-      if (project.id === selectedProjectId) {
-        const currentComponents = project.components || [];
-        return {
-          ...project,
-          components: currentComponents.filter((_, i) => i !== index),
-        };
-      }
-      return project;
-    }));
+    const { status, data } = await apiUpdateComponent(componentId, {
+      ...component,
+      projectId: selectedProjectId,
+      editorId: currentUserId,
+      editorName: currentUserName,
+    });
 
-    setAlertMessage('Component removed successfully!');
+    if (status === 200 && data && typeof data === 'object' && 'id' in data) {
+      const updatedComponent = data as ProjectComponent;
+      setProjects((previous) =>
+        previous.map((project) => {
+          if (project.id !== selectedProjectId) {
+            return project;
+          }
+          return {
+            ...project,
+            components: (project.components || []).map((existingComponent) =>
+              existingComponent.id === updatedComponent.id ? updatedComponent : existingComponent
+            ),
+          };
+        })
+      );
+      setComponentsLoadedByProject((previous) => ({ ...previous, [selectedProjectId]: true }));
+      void loadRequirementsForProject(selectedProjectId);
+      void loadComponentEventsForProject(selectedProjectId);
+      return true;
+    }
+
+    setAlertMessage('Failed to save component changes.');
     setShowSuccessAlert(true);
+    return false;
+  };
+
+  const handleRemoveComponent = async (componentId: string) => {
+    if (!selectedProjectId) {
+      return false;
+    }
+
+    const { status } = await apiDeleteComponent(componentId, currentUserId, currentUserName);
+    if (status === 204) {
+      setProjects((previous) =>
+        previous.map((project) => {
+          if (project.id !== selectedProjectId) {
+            return project;
+          }
+          return {
+            ...project,
+            components: (project.components || []).filter((component) => component.id !== componentId),
+          };
+        })
+      );
+      void loadRequirementsForProject(selectedProjectId);
+      void loadComponentEventsForProject(selectedProjectId);
+      setAlertMessage('Component removed successfully!');
+      setShowSuccessAlert(true);
+      return true;
+    }
+
+    setAlertMessage('Failed to remove component.');
+    setShowSuccessAlert(true);
+    return false;
   };
 
   const selectedOrg = organizations.find((org) => org.id === selectedOrgId);
@@ -896,6 +1092,16 @@ export function Dashboard() {
   const selectedProjectRequirementsError = selectedProjectId
     ? requirementsErrorByProject[selectedProjectId] || null
     : null;
+  const selectedProjectComponentsLoading = selectedProjectId
+    ? Boolean(componentsLoadingByProject[selectedProjectId])
+    : false;
+  const selectedProjectComponentsError = selectedProjectId
+    ? componentsErrorByProject[selectedProjectId] || null
+    : null;
+  const selectedProjectComponentEvents = selectedProjectId ? componentEventsByProject[selectedProjectId] || [] : [];
+  const selectedProjectComponentEventsLoading = selectedProjectId
+    ? Boolean(componentEventsLoadingByProject[selectedProjectId])
+    : false;
   const currentOrgJoinRequests = orgJoinRequests.filter((req) => req.organizationId === selectedOrgId);
 
   return (
@@ -1036,7 +1242,6 @@ export function Dashboard() {
               projectName={selectedProject.name}
               projectId={selectedProject.id}
               requirements={selectedProject.requirements || []}
-              components={selectedProject.components || []}
               requirementsLoading={selectedProjectRequirementsLoading}
               requirementsError={selectedProjectRequirementsError}
               onAddRequirement={handleAddRequirementInView}
@@ -1053,9 +1258,14 @@ export function Dashboard() {
               projectName={selectedProject.name}
               components={selectedProject.components || []}
               requirements={selectedProject.requirements || []}
+              componentsLoading={selectedProjectComponentsLoading}
+              componentsError={selectedProjectComponentsError}
               requirementsLoading={selectedProjectRequirementsLoading}
               requirementsError={selectedProjectRequirementsError}
+              componentEvents={selectedProjectComponentEvents}
+              componentEventsLoading={selectedProjectComponentEventsLoading}
               onAddComponent={handleAddComponentInView}
+              onUpdateComponent={handleUpdateComponentInView}
               onRemoveComponent={handleRemoveComponent}
             />
           ) : currentView === 'documents' && selectedProject ? (

@@ -42,7 +42,7 @@ export type ProjectRequirement = {
   projectId: string;
 };
 
-export type RequirementPayload = Omit<ProjectRequirement, 'id'>;
+export type RequirementPayload = Omit<ProjectRequirement, 'id' | 'assignedComponents'>;
 
 const mockRequirementsByProject = new Map<string, ProjectRequirement[]>();
 
@@ -114,7 +114,7 @@ async function mockRequest<T = JsonValue>(
       description,
       subsystem,
       tags: normalizeStringArray(body.tags),
-      assignedComponents: normalizeStringArray(body.assignedComponents),
+      assignedComponents: [],
       projectId,
     };
 
